@@ -1,4 +1,4 @@
-package backend.SecureAuthAPI;
+package backend.secureauthapi;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
