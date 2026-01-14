@@ -38,7 +38,7 @@ public class RefreshToken {
 
     @NotNull
     @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt = Instant.now();
+    private Instant createdAt;
 
     // When the token was used and replaced with a new one
     @Column(name = "rotated_at")
@@ -55,6 +55,12 @@ public class RefreshToken {
         this.tokenHash = tokenHash;
         this.user = user;
         this.expiresAt = expiresAt;
+    }
+
+    // This ensures the timestamp is set exactly when the entity is saved to the DB
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = Instant.now();
     }
 
     public boolean isExpired() {
