@@ -22,8 +22,8 @@ public class RefreshToken {
     private Long id;
 
     @NotBlank
-    @Column(name = "token", nullable = false, unique = true, length = 128)
-    private String token;
+    @Column(name = "token_hash", nullable = false, unique = true, length = 64)
+    private String tokenHash;
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -51,8 +51,8 @@ public class RefreshToken {
     private String ipAddress;
 
     // Public constructor for JPA
-    public RefreshToken(String token, User user, Instant expiresAt) {
-        this.token = token;
+    public RefreshToken(String tokenHash, User user, Instant expiresAt) {
+        this.tokenHash = tokenHash;
         this.user = user;
         this.expiresAt = expiresAt;
     }
