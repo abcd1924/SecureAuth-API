@@ -1,10 +1,12 @@
 package backend.secureauthapi.security.jwt;
 
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 import javax.crypto.SecretKey;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -24,11 +26,17 @@ public class JwtUtils {
     @Value("${security.jwt.expiration-ms}")
     private long jwtExpirationMs;
 
-    @Value("${security.jwt.refresh-expiration-ms}")
-    private long refreshExpirationMs;
+    private static final Logger logger = LoggerFactory.getLogger(JwtUtils.class);
 
-    // Generation Logic
+    // 1. Generation Logic
 
+    /**
+     * Generates a JWT access token for the authenticated user.
+     * The token includes user authorities as claims to avoid database lookups.
+     *
+     * @param userDetails the authenticated user details
+     * @return a signed JWT access token
+     */
     public String generateAccessToken(UserDetails userDetails) {
         // We include roles in the token to avoid DB lookups later
         Map<String, Object> extraClaims = Map.of(
@@ -36,10 +44,6 @@ public class JwtUtils {
                         .map(GrantedAuthority::getAuthority)
                         .toList());
         return buildToken(extraClaims, userDetails, jwtExpirationMs);
-    }
-
-    public String generateRefreshToken(UserDetails userDetails, long refreshExpirationMs) {
-        return buildToken(new HashMap<>(), userDetails, refreshExpirationMs);
     }
 
     private String buildToken(Map<String, Object> extraClaims, UserDetails userDetails, long expiration) {
@@ -52,8 +56,14 @@ public class JwtUtils {
                 .compact();
     }
 
-    // Extraction logic
+    // 2. Extraction logic
 
+    /**
+     * Extracts the username from the JWT token.
+     *
+     * @param token the JWT token
+     * @return the username extracted from the token
+     */
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
     }
@@ -83,13 +93,27 @@ public class JwtUtils {
                 .getPayload();
     }
 
-    // Validation Logic
+    // 3. Validation Logic
 
+    /**
+     * Validates a JWT token against the provided user details.
+     * Checks both the username match and token expiration.
+     *
+     * @param token       the JWT token to validate
+     * @param userDetails the user details to validate against
+     * @return true if the token is valid, false otherwise
+     */
     public boolean isTokenValid(String token, UserDetails userDetails) {
         try {
             final String username = extractUsername(token);
-            return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
-        } catch (JwtException | IllegalArgumentException e) {
+            return username != null
+                    && username.equals(userDetails.getUsername())
+                    && !isTokenExpired(token);
+        } catch (JwtException e) {
+            logger.debug("Invalid JWT: {}", e.getCause());
+            return false;
+        } catch (IllegalArgumentException e) {
+            logger.debug("JWT validation error: {}", e.getMessage());
             return false;
         }
     }
