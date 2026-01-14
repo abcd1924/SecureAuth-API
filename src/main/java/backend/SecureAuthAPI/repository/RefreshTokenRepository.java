@@ -15,7 +15,7 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
      * This is used to validate the token when it's used to generate a new access
      * token.
      */
-    Optional<RefreshToken> findByTokenAndRevokedFalse(String token);
+    Optional<RefreshToken> findByTokenHashAndRevokedFalse(String tokenHash);
 
     /**
      * Delete all the refresh tokens associated to a user.
