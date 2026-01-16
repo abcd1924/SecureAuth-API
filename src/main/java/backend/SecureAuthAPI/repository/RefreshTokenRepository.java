@@ -1,11 +1,10 @@
 package backend.secureauthapi.repository;
 
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.stereotype.Repository;
 import backend.secureauthapi.model.RefreshToken;
-import jakarta.transaction.Transactional;
 
 @Repository
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
@@ -18,13 +17,14 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
     Optional<RefreshToken> findByTokenHashAndRevokedFalse(String tokenHash);
 
     /**
-     * Delete all the refresh tokens associated to a user.
-     * Useful for cases of:
-     * 1. Logout: Delete the current session.
-     * 2. Password change: Delete ALL sessions (global logout).
-     * Return an int indicating how many records were deleted.
+     * Find all active (non-revoked) refresh tokens for a specific user.
+     * Used for revoking all sessions (e.g., logout all devices, password change).
      */
-    @Modifying // This modifies the database, it's not a query
-    @Transactional
-    int deleteByUserId(Long userId);
+    List<RefreshToken> findByUserIdAndRevokedFalse(Long userId);
+
+    /**
+     * Find a refresh token by its hash, regardless of revocation status.
+     * Used for detecting token reuse attacks.
+     */
+    Optional<RefreshToken> findByTokenHash(String tokenHash);
 }
