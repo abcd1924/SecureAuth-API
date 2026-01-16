@@ -13,8 +13,8 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "refresh_tokens")
 /**
- * Refresh Token is a random string that is used to generate a new access token
- * without the need to reauthenticate
+ * Refresh Token used for access token renewal without reauthentication.
+ * Stored hashed in the database, supports expiration and revocation.
  */
 public class RefreshToken {
     @Id
@@ -30,17 +30,21 @@ public class RefreshToken {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    // Token expiration timestamp - tokens cannot be used after this time
+    @NotNull
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
+    // Soft delete flag - true when token is manually revoked or rotated
     @Column(nullable = false)
     private boolean revoked = false;
 
+    // Token creation timestamp - set automatically on first persist
     @NotNull
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    // When the token was used and replaced with a new one
+    // Rotation timestamp - set when token is used and replaced with a new one
     @Column(name = "rotated_at")
     private Instant rotatedAt;
 
