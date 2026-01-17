@@ -1,4 +1,4 @@
-package backend.secureauthapi.exception.auth;
+package backend.secureauthapi.exception.token;
 
 public class InvalidRefreshTokenException extends RuntimeException {
 

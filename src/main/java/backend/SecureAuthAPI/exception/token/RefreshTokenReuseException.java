@@ -1,4 +1,4 @@
-package backend.secureauthapi.exception.auth;
+package backend.secureauthapi.exception.token;
 
 /**
  * Exception thrown when a refresh token is reused.
