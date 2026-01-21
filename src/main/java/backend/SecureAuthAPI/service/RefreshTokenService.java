@@ -8,6 +8,8 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import backend.secureauthapi.exception.token.InvalidRefreshTokenException;
+import backend.secureauthapi.exception.token.RefreshTokenReuseException;
 import backend.secureauthapi.model.RefreshToken;
 import backend.secureauthapi.model.User;
 import backend.secureauthapi.repository.RefreshTokenRepository;
@@ -108,8 +110,7 @@ public class RefreshTokenService {
         String tokenHash = hasher.hash(rawToken);
 
         RefreshToken existingToken = repository.findByTokenHash(tokenHash)
-                // TODO: More specific exception like InvalidRefreshTokenException
-                .orElseThrow(() -> new IllegalArgumentException("Token not found"));
+                .orElseThrow(() -> new InvalidRefreshTokenException("Refresh token not found"));
 
         validateToken(existingToken);
 
@@ -129,13 +130,11 @@ public class RefreshTokenService {
     private void validateToken(RefreshToken token) {
         if (token.isRevoked()) {
             revokeAllTokensByUser(token.getUser().getId());
-            // TODO: More specific exception like RefreshTokenReuseException
-            throw new SecurityException("Token reuse detected - all sessions revoked");
+            throw new RefreshTokenReuseException();
         }
 
         if (token.isExpired()) {
-            // TODO: More specific exception like InvalidRefreshTokenException
-            throw new SecurityException("Token has expired");
+            throw new InvalidRefreshTokenException("Refresh token has expired");
         }
     }
 
