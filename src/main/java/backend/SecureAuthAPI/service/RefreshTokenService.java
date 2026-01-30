@@ -28,8 +28,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class RefreshTokenService {
 
-    @Value("${security.jwt.refresh-expiration-ms}")
-    private Long refreshTokenDurationMs;
+    @Value("${security.jwt.refresh-expiration-ms}") private Long refreshTokenDurationMs;
 
     private final RefreshTokenRepository repository;
     private final RefreshTokenGenerator generator;
@@ -121,6 +120,22 @@ public class RefreshTokenService {
                 existingToken.getUser(),
                 existingToken.getDeviceInfo(),
                 existingToken.getIpAddress());
+    }
+
+    /**
+     * Retrieves the user associated with a refresh token.
+     * Validates the token before returning the user.
+     */
+    @Transactional(readOnly = true)
+    public User getUserFromRefreshToken(String rawToken) {
+        String tokenHash = hasher.hash(rawToken);
+
+        RefreshToken token = repository.findByTokenHash(tokenHash)
+                .orElseThrow(() -> new InvalidRefreshTokenException("Refresh token not found"));
+
+        validateToken(token);
+
+        return token.getUser();
     }
 
     /**
