@@ -11,7 +11,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import backend.secureauthapi.exception.auth.InvalidCredentialsException;
 import backend.secureauthapi.exception.token.InvalidRefreshTokenException;
 import backend.secureauthapi.exception.token.RefreshTokenReuseException;
+import backend.secureauthapi.exception.user.PasswordChangeException;
 import backend.secureauthapi.exception.user.UserAlreadyExistsException;
+import backend.secureauthapi.exception.user.UserInactiveException;
 import backend.secureauthapi.exception.user.UserNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -78,7 +80,8 @@ public class GlobalExceptionHandler {
                         RefreshTokenReuseException ex,
                         HttpServletRequest request) {
 
-                logger.error("SECURITY ALERT - Token reuse detected on path: {}", request.getRequestURI());
+                logger.error("SECURITY ALERT - Token reuse detected on path: {}",
+                                request.getRequestURI());
 
                 ErrorResponse error = ErrorResponse.builder()
                                 .status(HttpStatus.FORBIDDEN.value())
@@ -133,6 +136,50 @@ public class GlobalExceptionHandler {
                                 .build();
 
                 return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+        }
+
+        /**
+         * Handles incorrect password during password change operations.
+         * Returns 400 BAD_REQUEST since this is a validation error, not an authentication failure.
+         */
+        @ExceptionHandler(PasswordChangeException.class)
+        public ResponseEntity<ErrorResponse> handleInvalidPassword(
+                        PasswordChangeException ex,
+                        HttpServletRequest request) {
+
+                logger.debug("Invalid password attempt: {}", ex.getMessage());
+
+                ErrorResponse error = ErrorResponse.builder()
+                                .status(HttpStatus.BAD_REQUEST.value())
+                                .message(ex.getMessage())
+                                .timestamp(Instant.now())
+                                .path(request.getRequestURI())
+                                .errorCode("INVALID_PASSWORD")
+                                .build();
+
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
+
+        /**
+         * Handles attempts to access resources with an inactive user account.
+         * Returns 403 FORBIDDEN since the account exists but access is denied.
+         */
+        @ExceptionHandler(UserInactiveException.class)
+        public ResponseEntity<ErrorResponse> handleUserInactive(
+                        UserInactiveException ex,
+                        HttpServletRequest request) {
+
+                logger.warn("Inactive user access attempt on path: {}", request.getRequestURI());
+
+                ErrorResponse error = ErrorResponse.builder()
+                                .status(HttpStatus.FORBIDDEN.value())
+                                .message(ex.getMessage())
+                                .timestamp(Instant.now())
+                                .path(request.getRequestURI())
+                                .errorCode("USER_INACTIVE")
+                                .build();
+
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
         }
 
         /**
