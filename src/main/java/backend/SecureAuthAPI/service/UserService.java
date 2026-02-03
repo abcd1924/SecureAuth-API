@@ -1,5 +1,7 @@
 package backend.secureauthapi.service;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -7,6 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 import backend.secureauthapi.dto.ChangePasswordRequest;
 import backend.secureauthapi.dto.MessageResponse;
 import backend.secureauthapi.dto.UpdateProfileRequest;
+import backend.secureauthapi.dto.UpdateUserRoleRequest;
+import backend.secureauthapi.dto.UpdateUserStatusRequest;
 import backend.secureauthapi.dto.UserResponse;
 import backend.secureauthapi.exception.user.PasswordChangeException;
 import backend.secureauthapi.exception.user.UserNotFoundException;
@@ -23,6 +27,10 @@ public class UserService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
+
+    /**
+     * User methods
+     */
 
     @Transactional(readOnly = true)
     public UserResponse getCurrentUser() {
@@ -76,11 +84,68 @@ public class UserService {
     }
 
     private User getCurrentAuthenticatedUser() {
+
         String email = SecurityContextHolder.getContext()
                 .getAuthentication()
                 .getName();
 
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException());
+    }
+
+    /*
+     * Admin Methods
+     */
+
+    @Transactional(readOnly = true)
+    public Page<UserResponse> getAllUsers(Pageable pageable) {
+
+        return userRepository
+                .findAll(pageable)
+                .map(userMapper::toUserResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public UserResponse getUserById(Long id) {
+
+        return userRepository.findById(id)
+                .map(userMapper::toUserResponse)
+                .orElseThrow(() -> new UserNotFoundException());
+    }
+
+    @Transactional
+    public UserResponse updateUserRole(Long id, UpdateUserRoleRequest request) {
+
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException());
+
+        user.setRole(request.role());
+        User updatedUser = userRepository.save(user);
+
+        // Revoke all active sessions and force user to login again
+        refreshTokenService.revokeAllTokensByUser(id);
+
+        return userMapper.toUserResponse(updatedUser);
+    }
+
+    @Transactional
+    public MessageResponse updateUserStatus(Long id, UpdateUserStatusRequest request) {
+
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException());
+
+        user.setActive(request.active());
+        userRepository.save(user);
+
+        // If deactivating, revoke all active sessions
+        if (!request.active()) {
+            refreshTokenService.revokeAllTokensByUser(id);
+        }
+
+        String message = request.active()
+                ? "User account activated successfully"
+                : "User account deactivated successfully";
+
+        return new MessageResponse(message);
     }
 }
