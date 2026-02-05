@@ -56,7 +56,7 @@ public class AuthService {
         return userMapper.toUserResponse(savedUser);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public LoginResponse login(LoginRequest loginRequest, String deviceInfo, String ipAddress) {
 
         Authentication authentication = authenticationManager.authenticate(
