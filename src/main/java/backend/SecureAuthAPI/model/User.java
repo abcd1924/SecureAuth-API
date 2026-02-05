@@ -42,8 +42,12 @@ public class User {
     @Column(nullable = false, length = 20)
     private Role role;
 
-    @Column(nullable = false)
-    private boolean isActive = true;
+    /**
+     * User account status. When false, user cannot authenticate.
+     * This is a soft delete mechanism.
+     */
+    @Column(name = "is_active", nullable = false)
+    private boolean active = true;
 
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
@@ -67,5 +71,6 @@ public class User {
         this.email = email;
         this.passwordHash = passwordHash;
         this.role = role;
+        this.active = true;
     }
 }
