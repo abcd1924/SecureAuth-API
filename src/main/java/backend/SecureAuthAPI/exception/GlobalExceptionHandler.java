@@ -5,6 +5,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -47,6 +49,52 @@ public class GlobalExceptionHandler {
                                 .build();
 
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+        }
+
+        /**
+         * Handles authentication failures from Spring Security.
+         * This catches BadCredentialsException thrown by AuthenticationManager when credentials are
+         * invalid (wrong password or non-existent user).
+         * Returns a generic message to prevent user enumeration attacks.
+         */
+        @ExceptionHandler(BadCredentialsException.class)
+        public ResponseEntity<ErrorResponse> handleBadCredentials(
+                        BadCredentialsException ex,
+                        HttpServletRequest request) {
+
+                logger.warn("Authentication failed on path: {}", request.getRequestURI());
+
+                ErrorResponse error = ErrorResponse.builder()
+                                .status(HttpStatus.UNAUTHORIZED.value())
+                                .message("Invalid email or password")
+                                .timestamp(Instant.now())
+                                .path(request.getRequestURI())
+                                .errorCode("INVALID_CREDENTIALS")
+                                .build();
+
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+        }
+
+        /**
+         * Handles attempts to authenticate with a disabled (inactive) account.
+         * Spring Security throws this when UserDetails.isEnabled() returns false.
+         */
+        @ExceptionHandler(DisabledException.class)
+        public ResponseEntity<ErrorResponse> handleDisabledException(
+                        DisabledException ex,
+                        HttpServletRequest request) {
+
+                logger.warn("Disabled account login attempt on path: {}", request.getRequestURI());
+
+                ErrorResponse error = ErrorResponse.builder()
+                                .status(HttpStatus.FORBIDDEN.value())
+                                .message("User account is inactive")
+                                .timestamp(Instant.now())
+                                .path(request.getRequestURI())
+                                .errorCode("USER_INACTIVE")
+                                .build();
+
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
         }
 
         /**
