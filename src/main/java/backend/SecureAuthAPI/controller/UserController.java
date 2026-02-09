@@ -14,9 +14,11 @@ import backend.secureauthapi.dto.MessageResponse;
 import backend.secureauthapi.dto.UpdateProfileRequest;
 import backend.secureauthapi.dto.UserResponse;
 import backend.secureauthapi.service.UserService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
+@SecurityRequirement(name = "bearerAuth")
 @PreAuthorize("isAuthenticated()")
 @RestController
 @RequestMapping("/api/users")

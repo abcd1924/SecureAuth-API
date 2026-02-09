@@ -15,6 +15,7 @@ import backend.secureauthapi.dto.RefreshTokenResponse;
 import backend.secureauthapi.dto.RegisterRequest;
 import backend.secureauthapi.dto.UserResponse;
 import backend.secureauthapi.service.AuthService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -56,6 +57,7 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<MessageResponse> logout(@Valid @RequestBody LogoutRequest request) {
 
         authService.logout(request);

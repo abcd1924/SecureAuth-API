@@ -17,10 +17,12 @@ import backend.secureauthapi.dto.UpdateUserRoleRequest;
 import backend.secureauthapi.dto.UpdateUserStatusRequest;
 import backend.secureauthapi.dto.UserResponse;
 import backend.secureauthapi.service.UserService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 
+@SecurityRequirement(name = "bearerAuth")
 @PreAuthorize("hasRole('ADMIN')")
 @RestController
 @RequestMapping("/api/admin")
