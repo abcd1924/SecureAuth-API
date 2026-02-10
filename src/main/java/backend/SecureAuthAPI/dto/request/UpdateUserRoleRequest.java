@@ -1,4 +1,4 @@
-package backend.secureauthapi.dto;
+package backend.secureauthapi.dto.request;
 
 import backend.secureauthapi.model.Role;
 import io.swagger.v3.oas.annotations.media.Schema;

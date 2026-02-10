@@ -1,8 +1,8 @@
 package backend.secureauthapi.mapper;
 
 import org.springframework.stereotype.Component;
-import backend.secureauthapi.dto.RegisterRequest;
-import backend.secureauthapi.dto.UserResponse;
+import backend.secureauthapi.dto.request.RegisterRequest;
+import backend.secureauthapi.dto.response.UserResponse;
 import backend.secureauthapi.model.Role;
 import backend.secureauthapi.model.User;
 
