@@ -1,4 +1,4 @@
-package backend.secureauthapi.dto;
+package backend.secureauthapi.dto.response;
 
 import java.time.Instant;
 import io.swagger.v3.oas.annotations.media.Schema;
