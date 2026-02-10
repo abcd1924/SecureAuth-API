@@ -15,11 +15,19 @@ import backend.secureauthapi.dto.response.MessageResponse;
 import backend.secureauthapi.dto.response.RefreshTokenResponse;
 import backend.secureauthapi.dto.response.UserResponse;
 import backend.secureauthapi.service.AuthService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
+@Tag(
+    name = "Authentication",
+    description = "User authentication and session management endpoints"
+)
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -27,6 +35,12 @@ public class AuthController {
 
     private final AuthService authService;
 
+    @Operation(summary = "Register a new user")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "201", description = "User successfully registered"),
+        @ApiResponse(responseCode = "400", description = "Invalid request - validation errors"),
+        @ApiResponse(responseCode = "409", description = "Email already exists")
+    })
     @PostMapping("/register")
     public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request) {
 
@@ -35,6 +49,12 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.CREATED).body(userResponse);
     }
 
+    @Operation(summary = "Authenticate user and obtain JWT tokens")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully authenticated"),
+        @ApiResponse(responseCode = "401", description = "Invalid credentials"),
+        @ApiResponse(responseCode = "403", description = "Account is disabled")
+    })
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest) {
@@ -47,6 +67,11 @@ public class AuthController {
         return ResponseEntity.ok(loginResponse);
     }
 
+    @Operation(summary = "Refresh access token using refresh token")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Token refreshed successfully"),
+        @ApiResponse(responseCode = "401", description = "Invalid or expired refresh token")
+    })
     @PostMapping("/refresh")
     public ResponseEntity<RefreshTokenResponse> refreshToken(
             @Valid @RequestBody RefreshTokenRequest request) {
@@ -56,6 +81,11 @@ public class AuthController {
         return ResponseEntity.ok(refreshTokenResponse);
     }
 
+    @Operation(summary = "Logout user and invalidate refresh token")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully logged out"),
+        @ApiResponse(responseCode = "401", description = "Not authenticated")
+    })
     @PostMapping("/logout")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<MessageResponse> logout(@Valid @RequestBody LogoutRequest request) {
