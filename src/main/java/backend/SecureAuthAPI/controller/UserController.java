@@ -14,10 +14,18 @@ import backend.secureauthapi.dto.request.UpdateProfileRequest;
 import backend.secureauthapi.dto.response.MessageResponse;
 import backend.secureauthapi.dto.response.UserResponse;
 import backend.secureauthapi.service.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
+@Tag(
+    name = "User",
+    description = "User management endpoints for authenticated users"
+)
 @SecurityRequirement(name = "bearerAuth")
 @PreAuthorize("isAuthenticated()")
 @RestController
@@ -27,6 +35,11 @@ public class UserController {
 
     private final UserService userService;
 
+    @Operation(summary = "Get current user")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "User found"),
+            @ApiResponse(responseCode = "401", description = "User not authenticated")
+    })
     @GetMapping("/me")
     public ResponseEntity<UserResponse> getCurrentUser() {
 
@@ -35,6 +48,12 @@ public class UserController {
         return ResponseEntity.ok(userResponse);
     }
 
+    @Operation(summary = "Update current user profile")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "User profile updated successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid request - validation errors"),
+            @ApiResponse(responseCode = "401", description = "User not authenticated")
+    })
     @PatchMapping("/me")
     public ResponseEntity<UserResponse> updateProfile(
             @Valid @RequestBody UpdateProfileRequest request) {
@@ -44,11 +63,15 @@ public class UserController {
         return ResponseEntity.ok(userResponse);
     }
 
-    /**
-     * Changes the password of the currently authenticated user.
-     * Requires the current password for verification.
-     * All active sessions will be terminated after password change.
-     */
+    @Operation(
+            summary = "Change current user password",
+            description = "Requires the current password for verification. " +
+                    "All active sessions will be terminated after password change.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Password changed successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid request - validation errors"),
+            @ApiResponse(responseCode = "401", description = "Wrong current password")
+    })
     @PutMapping("/me/password")
     public ResponseEntity<MessageResponse> changePassword(
             @Valid @RequestBody ChangePasswordRequest request) {
@@ -58,11 +81,14 @@ public class UserController {
         return ResponseEntity.ok(messageResponse);
     }
 
-    /**
-     * Deactivates the account of the currently authenticated user.
-     * This is a soft delete - the account is marked as inactive but not removed.
-     * All active sessions will be terminated.
-     */
+    @Operation(summary = "Deactivate current user account",
+            description = "This is a soft delete - the account is marked as inactive but not removed. "
+                    +
+                    "All active sessions will be terminated.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Account deactivated"),
+            @ApiResponse(responseCode = "401", description = "User not authenticated")
+    })
     @DeleteMapping("/me")
     public ResponseEntity<MessageResponse> deactivateAccount() {
 
