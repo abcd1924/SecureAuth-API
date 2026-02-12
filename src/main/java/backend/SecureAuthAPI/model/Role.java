@@ -8,18 +8,19 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * Implements GrantedAuthority to facilitate direct integration with Spring
  * Security context.
  */
-@Schema(description = "User role in the system")
+@Schema(
+    description = """
+        User role within the system:
+        - ADMIN: Full administrative access, including system configuration and user management
+        - USER: Standard user with permissions limited to managing their own account
+        - AUDITOR: Read-only access for auditing and compliance
+        - SUPPORT: Customer support with restricted administrative privileges
+        """
+)
 public enum Role implements GrantedAuthority {
-    @Schema(description = "Full administrative access, including system configuration and user management")
     ADMIN("ROLE_ADMIN"),
-
-    @Schema(description = "Standard user with permissions limited to managing their own account and personal data")
     USER("ROLE_USER"),
-
-    @Schema(description = "Read-only access for auditing and compliance purposes")
     AUDITOR("ROLE_AUDITOR"),
-
-    @Schema(description = "Customer support role with restricted administrative privileges")
     SUPPORT("ROLE_SUPPORT");
 
     private final String authority;

@@ -34,12 +34,6 @@ public record UserResponse(
     @Email
     String email,
 
-    @Schema(
-        description = "User role in the system",
-        example = "USER",
-        allowableValues = {"USER", "ADMIN", "AUDITOR", "SUPPORT"},
-        requiredMode = Schema.RequiredMode.REQUIRED
-    )
     @NotNull
     Role role,
 
