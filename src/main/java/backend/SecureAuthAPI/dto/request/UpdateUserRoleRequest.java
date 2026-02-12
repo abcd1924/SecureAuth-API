@@ -9,12 +9,6 @@ import jakarta.validation.constraints.NotNull;
 )
 public record UpdateUserRoleRequest(
 
-    @Schema(
-        description = "User role in the system",
-        example = "ADMIN",
-        allowableValues = {"USER", "ADMIN", "AUDITOR", "SUPPORT"},
-        requiredMode = Schema.RequiredMode.REQUIRED
-    )
     @NotNull(message = "Role must be provided")
     Role role
 
