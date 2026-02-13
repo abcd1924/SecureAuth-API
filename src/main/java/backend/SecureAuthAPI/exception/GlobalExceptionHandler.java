@@ -22,6 +22,7 @@ import backend.secureauthapi.exception.user.UserAlreadyExistsException;
 import backend.secureauthapi.exception.user.UserInactiveException;
 import backend.secureauthapi.exception.user.UserNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 
 /**
  * Global exception handler for the entire application.
@@ -327,7 +328,7 @@ public class GlobalExceptionHandler {
         }
 
         /**
-         * Handles validation errors from @Valid annotations on request DTOs.
+         * Handles validation errors from @Valid @RequestBody annotations on request DTOs.
          * Returns the first validation error message for simplicity.
          */
         @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -350,6 +351,39 @@ public class GlobalExceptionHandler {
                                 .timestamp(Instant.now())
                                 .path(request.getRequestURI())
                                 .errorCode("VALIDATION_ERROR")
+                                .build();
+
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
+
+        /**
+         * Handles validation errors in @PathVariable and @RequestParam.
+         * Returns the first validation error message for simplicity.
+         */
+        @ExceptionHandler(ConstraintViolationException.class)
+        public ResponseEntity<ErrorResponse> handleConstraintViolationException(
+                        ConstraintViolationException ex,
+                        HttpServletRequest request) {
+                String errorMessage = ex.getConstraintViolations()
+                                .stream()
+                                .findFirst()
+                                .map(violation -> {
+                                        String propertyPath =
+                                                        violation.getPropertyPath().toString();
+                                        String paramName = propertyPath.substring(
+                                                        propertyPath.lastIndexOf(".") + 1);
+                                        return paramName + ": " + violation.getMessage();
+                                })
+                                .orElse("Invalid request parameter");
+
+                logger.debug("Constraint validation error: {}", errorMessage);
+
+                ErrorResponse error = ErrorResponse.builder()
+                                .status(HttpStatus.BAD_REQUEST.value())
+                                .message(errorMessage)
+                                .timestamp(Instant.now())
+                                .path(request.getRequestURI())
+                                .errorCode("CONSTRAINT_VIOLATION")
                                 .build();
 
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
