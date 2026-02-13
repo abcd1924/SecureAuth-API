@@ -1,15 +1,15 @@
 # SecureAuthAPI
 
-> **✅ Project Status: Core Features Implemented**  
+> **Project Status: Core Features Implemented**  
 > This project has successfully implemented the core authentication and authorization features. The API is functional and follows enterprise-grade best practices. Additional features and improvements are planned (see Roadmap).
 
-## 📋 Overview
+## Overview
 
 **SecureAuthAPI** is an enterprise-grade authentication and authorization REST API built with **Java 21** and **Spring Boot 3.5.9**. This project demonstrates production-ready backend development practices commonly used in modern enterprise applications.
 
 The API provides a complete authentication system with JWT-based token management, role-based authorization, and secure user management—designed to implements real-world authentication services used in production environments.
 
-### 🎯 Project Goals
+### Project Goals
 
 - Build a **production-ready** authentication API with enterprise standards
 - Implement **JWT authentication** with access and refresh token patterns
@@ -19,7 +19,7 @@ The API provides a complete authentication system with JWT-based token managemen
 
 ---
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 ### Core Technologies
 - **Java 21** - Latest LTS version with modern language features
@@ -44,7 +44,7 @@ The API provides a complete authentication system with JWT-based token managemen
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 This project follows a **layered architecture** pattern with clear separation of concerns:
 
@@ -60,7 +60,7 @@ backend.SecureAuthAPI/
 └── service/          # Business logic layer
 ```
 
-## ⚙️ Configuration
+## Configuration
 
 ### Application Properties
 
@@ -82,9 +82,9 @@ JWT_REFRESH_EXPIRATION_MS=604800000  # 7 days
 ---
 
 
-## ✨ Features Implemented
+## Features Implemented
 
-### ✅ Phase 1: Foundation (Completed)
+### Phase 1: Foundation (Completed)
 - [x] Project initialization with Spring Boot 3.5.9
 - [x] MySQL database configuration
 - [x] JWT configuration and utilities
@@ -93,28 +93,28 @@ JWT_REFRESH_EXPIRATION_MS=604800000  # 7 days
 - [x] Repository layer (UserRepository, RefreshTokenRepository)
 - [x] Service layer (AuthService, UserService, RefreshTokenService)
 
-### ✅ Phase 2: Core Features (Completed)
+### Phase 2: Core Features (Completed)
 - [x] User registration with email validation
 - [x] User login with JWT generation (Access + Refresh tokens)
 - [x] Token refresh mechanism
 - [x] Logout with token invalidation
 - [x] BCrypt password encryption
 
-### ✅ Phase 3: Security & Authorization (Completed)
+### Phase 3: Security & Authorization (Completed)
 - [x] Spring Security configuration
 - [x] JWT authentication filter
 - [x] Role-based authorization (USER, ADMIN, AUDITOR, SUPPORT)
 - [x] Global exception handling with custom exceptions
 - [x] Input validation with Bean Validation
 
-### ✅ Phase 4: Advanced Features (Completed)
+### Phase 4: Advanced Features (Completed)
 - [x] User profile management (GET /api/users/me)
 - [x] Admin endpoints (user management, role assignment)
 - [x] User enable/disable functionality
 - [x] User role update functionality
 
-### 🔄 Phase 5: Documentation & Testing (In Progress)
-- [ ] Swagger/OpenAPI documentation
+### Phase 5: Documentation & Testing (In Progress)
+- [X] Swagger/OpenAPI documentation
 - [ ] Unit tests
 - [ ] Integration tests
 - [ ] Postman collection
@@ -122,7 +122,7 @@ JWT_REFRESH_EXPIRATION_MS=604800000  # 7 days
 
 ---
 
-## 📡 API Endpoints
+## API Endpoints
 
 ### Authentication Endpoints
 
@@ -139,7 +139,7 @@ JWT_REFRESH_EXPIRATION_MS=604800000  # 7 days
 |--------|----------|-------------|---------------|---------------|
 | GET | `/api/users/me` | Get current user profile | Yes | Any authenticated user |
 | PATCH | `/api/users/me` | Update current user name | Yes | Any authenticated user |
-| PATCH | `/api/users/me/password` | Change current user password | Yes | Any authenticated user |
+| PUT | `/api/users/me/password` | Change current user password | Yes | Any authenticated user |
 | DELETE | `/api/users/me` | Deactivates current user account | Yes | Any authenticated user |
 
 ### Admin Endpoints
@@ -153,7 +153,53 @@ JWT_REFRESH_EXPIRATION_MS=604800000  # 7 days
 
 ---
 
-## 🚀 Getting Started
+## API Documentation
+
+### Interactive API Documentation (Swagger UI)
+
+This API includes interactive documentation powered by Swagger/OpenAPI, allowing you to explore and test all endpoints directly from your browser.
+
+**Access Swagger UI:** `http://localhost:8080/swagger-ui.html`
+
+**Features:**
+- Browse all available endpoints organized by tags
+- View request/response schemas with examples
+- Test endpoints directly from the browser
+- Authenticate with JWT to test protected endpoints
+
+### How to use Swagger UI
+
+1. Start the application (use Getting Started section)
+2. Open Swagger UI in your browser: `http://localhost:8080/swagger-ui.html`
+3. Authenticate (for protected endpoints):
+- Click the **"Authorize"** button (🔓 icon) at the top right
+- Register first using `POST /api/auth/register` to create a user
+- Login first using `POST /api/auth/login` to obtain an access token
+- Copy the `accessToken` from the response
+- Paste it in the authorization modal (without "Bearer " prefix)
+- Click **"Authorize"**
+- Now you can test protected endpoints
+
+4. Test an endpoint:
+- Expand any endpoint (e.g., `GET /api/users/me`)
+- Click **"Try it out"**
+- Fill in any required parameters
+- Click **"Execute"**
+- View the response
+
+<div align = "center">
+  <h2>Swagger UI Screenshot</h2>
+  <img src="docs/images/swagger-ui-screenshot.png" alt="Swagger UI Screenshot" width = "600">
+  <p><em>Interactive API documentation showing all available endpoints</em></p> 
+</div>
+
+### OpenAPI Specification
+
+The raw OpenAPI 3.0 specification is available at: `http://localhost:8080/v3/api-docs`
+
+---
+
+## Getting Started
 
 ### Prerequisites
 
@@ -252,7 +298,7 @@ curl -X GET http://localhost:8080/api/users/me \
 
 ---
 
-## 🔮 Future Improvements
+## Future Improvements
 
 ### Planned Features
 - [ ] Email verification for new registrations
@@ -260,7 +306,7 @@ curl -X GET http://localhost:8080/api/users/me \
 - [ ] Account lockout after failed login attempts
 - [ ] Audit logging for security events
 - [ ] Rate limiting for API endpoints
-- [ ] Swagger/OpenAPI documentation
+- [X] Swagger/OpenAPI documentation
 - [ ] Comprehensive test suite (unit + integration)
 - [ ] Docker containerization
 - [ ] CI/CD pipeline setup
@@ -268,7 +314,7 @@ curl -X GET http://localhost:8080/api/users/me \
 
 ---
 
-## 📝 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
@@ -276,7 +322,7 @@ This project is developed for educational and portfolio purposes.
 
 ---
 
-## 👤 Author
+## Author
 
 **Valentino Castro**
 - LinkedIn: https://www.linkedin.com/in/valentino-castro-0a929831a
@@ -284,7 +330,7 @@ This project is developed for educational and portfolio purposes.
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 This project was built to demonstrate enterprise-level Java backend development skills, following industry best practices commonly used in production environments at technology companies in the United States.
 
