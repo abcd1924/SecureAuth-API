@@ -22,10 +22,14 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 import backend.secureauthapi.dto.request.LoginRequest;
+import backend.secureauthapi.dto.request.RefreshTokenRequest;
 import backend.secureauthapi.dto.request.RegisterRequest;
 import backend.secureauthapi.dto.response.LoginResponse;
+import backend.secureauthapi.dto.response.RefreshTokenResponse;
 import backend.secureauthapi.dto.response.UserResponse;
 import backend.secureauthapi.exception.auth.InvalidCredentialsException;
+import backend.secureauthapi.exception.token.InvalidRefreshTokenException;
+import backend.secureauthapi.exception.token.RefreshTokenReuseException;
 import backend.secureauthapi.exception.user.UserAlreadyExistsException;
 import backend.secureauthapi.mapper.UserMapper;
 import backend.secureauthapi.model.Role;
@@ -249,7 +253,7 @@ class AuthServiceTest {
                     null, userDetails.getAuthorities());
 
             when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
-                .thenReturn(authentication);
+                    .thenReturn(authentication);
 
             when(jwtUtils.generateAccessToken(eq(userDetails))).thenReturn("some.token");
 
@@ -257,8 +261,8 @@ class AuthServiceTest {
 
             // When & Then
             assertThatThrownBy(() -> authService.login(request, "Chrome", "127.0.0.1"))
-                .isInstanceOf(InvalidCredentialsException.class)
-                .hasMessageContaining("Invalid credentials");
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessageContaining("Invalid credentials");
 
             // Verify
             verify(userRepository).findByEmail(eq(request.email()));
@@ -271,6 +275,100 @@ class AuthServiceTest {
 
         private UserResponse createUserResponse(User user) {
             return new UserResponse(1L, "John", "john@example.com", Role.USER, true, Instant.now());
+        }
+    }
+
+    @Nested
+    @DisplayName("Refresh Token Tests")
+    class RefreshTokenTests {
+
+        @Test
+        @DisplayName("Should return new tokens when refresh token is valid")
+        void refreshToken_shouldReturnNewTokens_whenRefreshTokenIsValid() {
+
+            // Given
+            String oldRefreshToken = "old-refresh-token-uuid";
+            RefreshTokenRequest request = new RefreshTokenRequest(oldRefreshToken);
+
+            User user = createSavedUser("encodedPassword");
+            UserDetailsImpl userDetails = UserDetailsImpl.build(user);
+
+            String newAccessToken = "new.jwt.access.token";
+            String newRefreshToken = "new-refresh-token-uuid";
+
+            when(refreshTokenService.getUserFromRefreshToken(eq(oldRefreshToken))).thenReturn(user);
+
+            when(refreshTokenService.rotateAndIssueRefreshToken(eq(oldRefreshToken)))
+                    .thenReturn(newRefreshToken);
+
+            when(userDetailsService.loadUserByUsername(eq(user.getEmail())))
+                    .thenReturn(userDetails);
+
+            when(jwtUtils.generateAccessToken(eq(userDetails))).thenReturn(newAccessToken);
+
+            // When
+            RefreshTokenResponse result = authService.refreshToken(request);
+
+            // Then
+            assertThat(result).isNotNull();
+            assertThat(result.accessToken()).isEqualTo(newAccessToken);
+            assertThat(result.refreshToken()).isEqualTo(newRefreshToken);
+            assertThat(result.tokenType()).isEqualTo(LoginResponse.TokenType.BEARER);
+            assertThat(result.expiresAt()).isNotNull().isAfter(Instant.now());
+
+            // Verify
+            verify(refreshTokenService).getUserFromRefreshToken(eq(oldRefreshToken));
+            verify(refreshTokenService).rotateAndIssueRefreshToken(eq(oldRefreshToken));
+            verify(userDetailsService).loadUserByUsername(eq(user.getEmail()));
+            verify(jwtUtils).generateAccessToken(eq(userDetails));
+        }
+
+        @Test
+        @DisplayName("Should throw InvalidRefreshTokenException when token is invalid or expired")
+        void refreshToken_shouldThrowException_whenTokenIsInvalid() {
+
+            // Given
+            String invalidToken = "expired-or-invalid-token";
+            RefreshTokenRequest request = new RefreshTokenRequest(invalidToken);
+
+            when(refreshTokenService.getUserFromRefreshToken(eq(invalidToken)))
+                    .thenThrow(new InvalidRefreshTokenException());
+
+            // When & Then
+            assertThatThrownBy(() -> authService.refreshToken(request))
+                    .isInstanceOf(InvalidRefreshTokenException.class)
+                    .hasMessageContaining("Invalid refresh token");
+
+            // Verify
+            verify(refreshTokenService).getUserFromRefreshToken(invalidToken);
+            verifyNoInteractions(userDetailsService, jwtUtils);
+            verify(refreshTokenService, never()).rotateAndIssueRefreshToken(any());
+        }
+
+        @Test
+        @DisplayName("Should throw RefreshTokenReuseException when token has already been used")
+        void refreshToken_shouldThrowException_whenTokenIsReused() {
+
+            // Given
+            String reusedToken = "already-used-refresh-token";
+            RefreshTokenRequest request = new RefreshTokenRequest(reusedToken);
+
+            User user = createSavedUser("encodedPassword");
+
+            when(refreshTokenService.getUserFromRefreshToken(eq(reusedToken))).thenReturn(user);
+
+            when(refreshTokenService.rotateAndIssueRefreshToken(reusedToken))
+                    .thenThrow(new RefreshTokenReuseException());
+
+            // When & Then
+            assertThatThrownBy(() -> authService.refreshToken(request))
+                    .isInstanceOf(RefreshTokenReuseException.class)
+                    .hasMessageContaining("Refresh token reuse detected");
+
+            // Verify
+            verify(refreshTokenService).getUserFromRefreshToken(eq(reusedToken));
+            verify(refreshTokenService).rotateAndIssueRefreshToken(eq(reusedToken));
+            verifyNoInteractions(userDetailsService, jwtUtils);
         }
     }
 
