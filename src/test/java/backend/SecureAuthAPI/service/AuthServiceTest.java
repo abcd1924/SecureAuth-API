@@ -22,9 +22,11 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 import backend.secureauthapi.dto.request.LoginRequest;
+import backend.secureauthapi.dto.request.LogoutRequest;
 import backend.secureauthapi.dto.request.RefreshTokenRequest;
 import backend.secureauthapi.dto.request.RegisterRequest;
 import backend.secureauthapi.dto.response.LoginResponse;
+import backend.secureauthapi.dto.response.MessageResponse;
 import backend.secureauthapi.dto.response.RefreshTokenResponse;
 import backend.secureauthapi.dto.response.UserResponse;
 import backend.secureauthapi.exception.auth.InvalidCredentialsException;
@@ -369,6 +371,56 @@ class AuthServiceTest {
             verify(refreshTokenService).getUserFromRefreshToken(eq(reusedToken));
             verify(refreshTokenService).rotateAndIssueRefreshToken(eq(reusedToken));
             verifyNoInteractions(userDetailsService, jwtUtils);
+        }
+    }
+
+    @Nested
+    @DisplayName("Logout Tests")
+    class LogoutTests {
+
+        @Test
+        @DisplayName("Should revoke refresh token and return success message")
+        void logout_shouldRevokeTokenAndReturnSuccessMessage() {
+
+                //Given
+                String refreshToken = "valid-refresh-token-uuid";
+                LogoutRequest request = new LogoutRequest(refreshToken);
+
+                doNothing().when(refreshTokenService).revokeToken(eq(refreshToken));
+
+                // When
+                MessageResponse result = authService.logout(request);
+
+                // Then
+                assertThat(result).isNotNull();
+                assertThat(result.message()).isEqualTo("Logout successful");
+                assertThat(result.timestamp()).isNotNull().isBeforeOrEqualTo(Instant.now());
+
+                // Verify
+                verify(refreshTokenService).revokeToken(eq(refreshToken));
+                verifyNoMoreInteractions(userRepository, jwtUtils, userMapper, passwordEncoder);
+        }
+
+        @Test
+        @DisplayName("Should return success message even when token is already revoked or does not exist")
+        void logout_shouldReturnSuccessMessage_whenTokenIsAlreadyRevokedOrNotFound() {
+
+                // Given
+                String alreadyRevokedToken = "already-revoked-token";
+                LogoutRequest request = new LogoutRequest(alreadyRevokedToken);
+
+                // revokeToken() uses ifPresent, so it will not throw an exception
+                doNothing().when(refreshTokenService).revokeToken(eq(alreadyRevokedToken));
+
+                // When
+                MessageResponse result = authService.logout(request);
+
+                // Then
+                assertThat(result).isNotNull();
+                assertThat(result.message()).isEqualTo("Logout successful");
+
+                // Verify
+                verify(refreshTokenService).revokeToken(eq(alreadyRevokedToken));
         }
     }
 
