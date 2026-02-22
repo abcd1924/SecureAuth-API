@@ -2,7 +2,9 @@ package backend.SecureAuthAPI.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -20,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import backend.secureauthapi.dto.request.UpdateProfileRequest;
 import backend.secureauthapi.dto.response.UserResponse;
 import backend.secureauthapi.exception.user.UserNotFoundException;
 import backend.secureauthapi.mapper.UserMapper;
@@ -100,6 +103,63 @@ class UserServiceTest {
 
             // Verify
             verify(userRepository).findByEmail(eq("john@example.com"));
+            verifyNoInteractions(userMapper);
+        }
+    }
+
+    @Nested
+    @DisplayName("Update Profile Tests")
+    class UpdateProfileTests {
+
+        @Test
+        @DisplayName("Should update user name and return updated UserResponse")
+        void updateProfile_shouldReturnUpdateUserResponse_whenUserExists() {
+
+            // Given
+            UpdateProfileRequest request = new UpdateProfileRequest("Jane Doe");
+            User user = createSavedUser();
+
+            User updatedUser = createSavedUser();
+            updatedUser.setName("Jane Doe");
+
+            UserResponse expectedResponse = new UserResponse(1L, "Jane Doe", "john@example.com",
+                    Role.USER, true, user.getCreatedAt());
+
+            when(userRepository.findByEmail(eq("john@example.com"))).thenReturn(Optional.of(user));
+            when(userRepository.save(eq(user))).thenReturn(updatedUser);
+            when(userMapper.toUserResponse(eq(updatedUser))).thenReturn(expectedResponse);
+
+            // When
+            UserResponse result = userService.updateProfile(request);
+
+            // Then
+            assertThat(result).isNotNull();
+            assertThat(result.name()).isEqualTo(request.name());
+            assertThat(result.email()).isEqualTo("john@example.com");
+
+            // Verify
+            verify(userRepository).findByEmail(eq("john@example.com"));
+            verify(userRepository).save(eq(user));
+            verify(userMapper).toUserResponse(eq(updatedUser));
+        }
+
+        @Test
+        @DisplayName("Should throw UserNotFoundException when authenticated user does not exist")
+        void updateProfile_shouldThrowException_whenUserNotFound() {
+
+            // Given
+            UpdateProfileRequest request = new UpdateProfileRequest("Jane Doe");
+
+            when(userRepository.findByEmail(eq("john@example.com"))).thenReturn(Optional.empty());
+
+            // When & Then
+            assertThatThrownBy(() -> userService.updateProfile(request))
+                .isInstanceOf(UserNotFoundException.class)
+                .hasMessageContaining("User not found");
+
+            // Verify
+            verify(userRepository).findByEmail("john@example.com");
+            verify(userRepository, never()).save(any());
             verifyNoInteractions(userMapper);
         }
     }
