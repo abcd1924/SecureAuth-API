@@ -22,8 +22,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import backend.secureauthapi.dto.request.ChangePasswordRequest;
 import backend.secureauthapi.dto.request.UpdateProfileRequest;
+import backend.secureauthapi.dto.response.MessageResponse;
 import backend.secureauthapi.dto.response.UserResponse;
+import backend.secureauthapi.exception.user.PasswordChangeException;
 import backend.secureauthapi.exception.user.UserNotFoundException;
 import backend.secureauthapi.mapper.UserMapper;
 import backend.secureauthapi.model.Role;
@@ -154,13 +157,107 @@ class UserServiceTest {
 
             // When & Then
             assertThatThrownBy(() -> userService.updateProfile(request))
-                .isInstanceOf(UserNotFoundException.class)
-                .hasMessageContaining("User not found");
+                    .isInstanceOf(UserNotFoundException.class)
+                    .hasMessageContaining("User not found");
 
             // Verify
             verify(userRepository).findByEmail("john@example.com");
             verify(userRepository, never()).save(any());
             verifyNoInteractions(userMapper);
+        }
+    }
+
+    @Nested
+    @DisplayName("Change Password Tests")
+    class ChangePasswordTests {
+
+        @Test
+        @DisplayName("Should change password, encode it and revoke all user sesions")
+        void changePassword_shouldEncodePasswordAndRevokeSessions_whenCurrentPasswordIsCorrect() {
+
+            // Given
+            ChangePasswordRequest request = new ChangePasswordRequest("OldPass123!", "NewPass456!");
+            User user = createSavedUser();
+
+            String newEncodedPassword = "encodedPassword";
+
+            when(userRepository.findByEmail(eq(user.getEmail()))).thenReturn(Optional.of(user));
+
+            when(passwordEncoder.matches(eq(request.currentPassword()), eq(user.getPasswordHash())))
+                    .thenReturn(true);
+
+            when(passwordEncoder.encode(eq(request.newPassword()))).thenReturn(newEncodedPassword);
+
+            // When
+            MessageResponse result = userService.changePassword(request);
+
+            // Then
+            assertThat(result).isNotNull();
+
+            assertThat(result.message())
+                    .isEqualTo("Password changed successfully. Please login again.");
+
+            assertThat(user.getPasswordHash()).isEqualTo(newEncodedPassword);
+
+            assertThat(result.timestamp()).isNotNull().isBeforeOrEqualTo(Instant.now());
+
+            // Verify
+            verify(passwordEncoder).matches(eq(request.currentPassword()),
+                    eq(user.getPasswordHash()));
+
+            verify(passwordEncoder).encode(eq(request.newPassword()));
+
+            verify(userRepository).save(eq(user));
+
+            verify(refreshTokenService).revokeAllTokensByUser(eq(user.getId()));
+        }
+
+        @Test
+        @DisplayName("Should throw PasswordChangeException when current password is incorrect")
+        void changePassword_shouldThrowException_whenCurrentPasswordIsIncorrect() {
+
+            // Given
+            ChangePasswordRequest request = new ChangePasswordRequest("WrongPass!", "NewPass456!");
+            User user = createSavedUser();
+
+            when(userRepository.findByEmail(eq(user.getEmail()))).thenReturn(Optional.of(user));
+
+            when(passwordEncoder.matches(eq(request.currentPassword()), eq(user.getPasswordHash())))
+                    .thenReturn(false);
+
+            // When & Then
+            assertThatThrownBy(() -> userService.changePassword(request))
+                    .isInstanceOf(PasswordChangeException.class)
+                    .hasMessageContaining("Current password is incorrect");
+
+            // Verify
+            verify(passwordEncoder).matches(eq(request.currentPassword()),
+                    eq(user.getPasswordHash()));
+
+            verify(passwordEncoder, never()).encode(any());
+
+            verify(userRepository, never()).save(any());
+
+            verifyNoInteractions(refreshTokenService);
+        }
+
+        @Test
+        @DisplayName("Should throw UserNotFoundException when authenticated user does not exist")
+        void changePassword_shouldThrowException_whenUserNotFound() {
+
+            // Given
+            ChangePasswordRequest request = new ChangePasswordRequest("OldPass123!", "NewPass456!");
+
+            when(userRepository.findByEmail(eq("john@example.com"))).thenReturn(Optional.empty());
+
+            // When & Then
+            assertThatThrownBy(() -> userService.changePassword(request))
+                .isInstanceOf(UserNotFoundException.class)
+                .hasMessageContaining("User not found");
+
+            // Verify
+            verifyNoInteractions(passwordEncoder, refreshTokenService);
+            verify(userRepository, never()).save(any());
         }
     }
 
