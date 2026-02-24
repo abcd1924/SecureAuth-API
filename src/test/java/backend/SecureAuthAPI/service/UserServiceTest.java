@@ -252,12 +252,59 @@ class UserServiceTest {
 
             // When & Then
             assertThatThrownBy(() -> userService.changePassword(request))
-                .isInstanceOf(UserNotFoundException.class)
-                .hasMessageContaining("User not found");
+                    .isInstanceOf(UserNotFoundException.class)
+                    .hasMessageContaining("User not found");
 
             // Verify
             verifyNoInteractions(passwordEncoder, refreshTokenService);
             verify(userRepository, never()).save(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("Deactivate Account Tests")
+    class DeactivateAccountTests {
+
+        @Test
+        @DisplayName("Should deactivate account and revoke all user sessions")
+        void deactivateAccount_shouldDeactivateAndRevokeAllSessions_whenUserExists() {
+
+            // Given
+            User user = createSavedUser();
+
+            when(userRepository.findByEmail(eq(user.getEmail()))).thenReturn(Optional.of(user));
+
+            // When
+            MessageResponse result = userService.deactivateAccount();
+
+            // Then
+            assertThat(result).isNotNull();
+            assertThat(result.message()).isEqualTo("Account deactivated successfully");
+            assertThat(user.isActive()).isFalse();
+            assertThat(result.timestamp()).isNotNull().isBeforeOrEqualTo(Instant.now());
+
+            // Verify
+            verify(userRepository).findByEmail(eq(user.getEmail()));
+            verify(userRepository).save(eq(user));
+            verify(refreshTokenService).revokeAllTokensByUser(user.getId());
+        }
+
+        @Test
+        @DisplayName("Should throw UserNotFoundException when authenticated user does not exist")
+        void deactivateAccount_shouldThrowException_whenUserNotFound() {
+
+            // Given
+            when(userRepository.findByEmail(eq("john@example.com"))).thenReturn(Optional.empty());
+
+            // When & Then
+            assertThatThrownBy(() -> userService.deactivateAccount())
+                    .isInstanceOf(UserNotFoundException.class)
+                    .hasMessageContaining("User not found");
+
+            // Verify
+            verify(userRepository).findByEmail(eq("john@example.com"));
+            verify(userRepository, never()).save(any());
+            verifyNoInteractions(refreshTokenService);
         }
     }
 
