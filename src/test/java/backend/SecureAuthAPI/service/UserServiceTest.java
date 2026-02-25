@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +20,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -305,6 +310,73 @@ class UserServiceTest {
             verify(userRepository).findByEmail(eq("john@example.com"));
             verify(userRepository, never()).save(any());
             verifyNoInteractions(refreshTokenService);
+        }
+    }
+
+    /*
+     * Admin Methods
+     */
+
+    @Nested
+    @DisplayName("Get all Users Tests")
+    class GetAllUsersTests {
+
+        @Test
+        @DisplayName("Should return page with mapped users when users exists")
+        void getAllUsers_shouldReturnPageWithMappedUsers_whenUsersExists() {
+
+            // Given
+            Pageable pageable = PageRequest.of(0, 5);
+
+            User user1 = createSavedUser();
+            User user2 = createSavedUser(); user2.setId(2L);
+            List<User> users = List.of(user1, user2);
+            Page<User> userPage = new PageImpl<>(users, pageable, users.size());
+
+            UserResponse response1 = createUserResponse(user1);
+            UserResponse response2 = createUserResponse(user2);
+
+            when(userRepository.findAll(pageable)).thenReturn(userPage);
+            when(userMapper.toUserResponse(user1)).thenReturn(response1);
+            when(userMapper.toUserResponse(user2)).thenReturn(response2);
+
+            // When
+            Page<UserResponse> result = userService.getAllUsers(pageable);
+
+            // Then
+            assertThat(result).isNotNull();
+            assertThat(result.getContent()).hasSize(2);
+            assertThat(result.getContent()).containsExactly(response1, response2);
+            assertThat(result.getTotalElements()).isEqualTo(2);
+            assertThat(result.getNumber()).isZero();
+
+            // Verify
+            verify(userRepository).findAll(eq(pageable));
+            verify(userMapper).toUserResponse(user1);
+            verify(userMapper).toUserResponse(user2);
+        }
+
+        @Test
+        @DisplayName("Should return empty page when there are no users")
+        void getAllUsers_shouldReturnEmptyPage_whenNoUsersFound() {
+
+            // Given
+            Pageable pageable = PageRequest.of(0, 5);
+            Page<User> emptyPage = new PageImpl<>(List.of(), pageable, 0);
+
+            when(userRepository.findAll(eq(pageable))).thenReturn(emptyPage);
+
+            // When
+            Page<UserResponse> result = userService.getAllUsers(pageable);
+
+            // Then
+            assertThat(result).isNotNull();
+            assertThat(result.getContent()).isEmpty();
+            assertThat(result.getTotalElements()).isZero();
+
+            // Verify
+            verify(userRepository).findAll(eq(pageable));
+            verifyNoInteractions(userMapper);
         }
     }
 
