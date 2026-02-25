@@ -380,6 +380,52 @@ class UserServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("Get User By Id Tests")
+    class GetUserByIdTests {
+
+        @Test
+        @DisplayName("Should return UserResponse when user exists")
+        void getUserById_shouldReturnUserResponse_whenUserExists() {
+
+            // Given
+            User user = createSavedUser();
+            UserResponse expectedResponse = createUserResponse(user);
+
+            when(userRepository.findById(eq(user.getId()))).thenReturn(Optional.of(user));
+            when(userMapper.toUserResponse(eq(user))).thenReturn(expectedResponse);
+
+            // When
+            UserResponse result = userService.getUserById(user.getId());
+
+            // Then
+            assertThat(result).isNotNull();
+            assertThat(result.id()).isEqualTo(user.getId());
+            assertThat(result.email()).isEqualTo(user.getEmail());
+
+            // Verify
+            verify(userRepository).findById(eq(user.getId()));
+            verify(userMapper).toUserResponse(eq(user));
+        }
+
+        @Test
+        @DisplayName("Should throw UserNotFoundException when user does not exist")
+        void getUserById_shouldThrowException_whenUserNotFound() {
+
+            // Given
+            when(userRepository.findById(eq(99L))).thenReturn(Optional.empty());
+
+            // When & Then
+            assertThatThrownBy(() -> userService.getUserById(99L))
+                .isInstanceOf(UserNotFoundException.class)
+                .hasMessageContaining("User not found");
+
+            // Verify
+            verify(userRepository).findById(eq(99L));
+            verifyNoInteractions(userMapper);
+        }
+    }
+
     private User createSavedUser() {
         User user = new User("John Doe", "john@example.com", "encodedPassword", Role.USER);
         user.setId(1L);
