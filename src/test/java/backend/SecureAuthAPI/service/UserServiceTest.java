@@ -29,6 +29,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import backend.secureauthapi.dto.request.ChangePasswordRequest;
 import backend.secureauthapi.dto.request.UpdateProfileRequest;
+import backend.secureauthapi.dto.request.UpdateUserRoleRequest;
 import backend.secureauthapi.dto.response.MessageResponse;
 import backend.secureauthapi.dto.response.UserResponse;
 import backend.secureauthapi.exception.user.PasswordChangeException;
@@ -423,6 +424,63 @@ class UserServiceTest {
             // Verify
             verify(userRepository).findById(eq(99L));
             verifyNoInteractions(userMapper);
+        }
+    }
+
+    @Nested
+    @DisplayName("Update User Role Tests")
+    class UpdateUserRoleTests {
+
+        @Test
+        @DisplayName("Should update user role, save and revoke all sessions")
+        void updateUserRole_shouldUpdateRoleAndRevokeSessions_whenUserExists() {
+
+            // Given
+            UpdateUserRoleRequest request = new UpdateUserRoleRequest(Role.ADMIN);
+            User user = createSavedUser();
+
+            User updateUser = createSavedUser();
+            updateUser.setRole(Role.ADMIN);
+
+            UserResponse expectedResponse = createUserResponse(updateUser);
+
+            when(userRepository.findById(eq(user.getId()))).thenReturn(Optional.of(user));
+            when(userRepository.save(eq(user))).thenReturn(updateUser);
+            when(userMapper.toUserResponse(eq(updateUser))).thenReturn(expectedResponse);
+
+            // When
+            UserResponse result = userService.updateUserRole(user.getId(), request);
+
+            // Then
+            assertThat(result).isNotNull();
+            assertThat(result.role()).isEqualTo(updateUser.getRole());
+            assertThat(user.getRole()).isEqualTo(Role.ADMIN);
+
+            // Verify
+            verify(userRepository).findById(eq(user.getId()));
+            verify(userRepository).save(eq(user));
+            verify(refreshTokenService).revokeAllTokensByUser(eq(user.getId()));
+            verify(userMapper).toUserResponse(eq(updateUser));
+        }
+
+        @Test
+        @DisplayName("Should throw UserNotFoundException when user does not exist")
+        void updateUserRole_shouldThrowException_whenUserNotFound() {
+
+            // Given
+            UpdateUserRoleRequest request = new UpdateUserRoleRequest(Role.ADMIN);
+
+            when(userRepository.findById(eq(99L))).thenReturn(Optional.empty());
+
+            // When & Then
+            assertThatThrownBy(() -> userService.updateUserRole(99L, request))
+                .isInstanceOf(UserNotFoundException.class)
+                .hasMessageContaining("User not found");
+
+            // Verify
+            verify(userRepository).findById(eq(99L));
+            verify(userRepository, never()).save(any());
+            verifyNoInteractions(refreshTokenService, userMapper);
         }
     }
 
