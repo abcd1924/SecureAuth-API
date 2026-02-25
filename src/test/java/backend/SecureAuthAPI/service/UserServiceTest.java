@@ -30,6 +30,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import backend.secureauthapi.dto.request.ChangePasswordRequest;
 import backend.secureauthapi.dto.request.UpdateProfileRequest;
 import backend.secureauthapi.dto.request.UpdateUserRoleRequest;
+import backend.secureauthapi.dto.request.UpdateUserStatusRequest;
 import backend.secureauthapi.dto.response.MessageResponse;
 import backend.secureauthapi.dto.response.UserResponse;
 import backend.secureauthapi.exception.user.PasswordChangeException;
@@ -481,6 +482,79 @@ class UserServiceTest {
             verify(userRepository).findById(eq(99L));
             verify(userRepository, never()).save(any());
             verifyNoInteractions(refreshTokenService, userMapper);
+        }
+    }
+
+    @Nested
+    @DisplayName("Update User Status Tests")
+    class UpdateUserStatusTests {
+
+        @Test
+        @DisplayName("Should activate user and return success message without revoking sessions")
+        void updateUserStatus_shouldActivateUser_andNotRevokeSessions() {
+
+            // Given
+            UpdateUserStatusRequest request = new UpdateUserStatusRequest(true);
+            User user = createSavedUser();
+
+            when(userRepository.findById(eq(user.getId()))).thenReturn(Optional.of(user));
+
+            // When
+            MessageResponse result = userService.updateUserStatus(user.getId(), request);
+
+            // Then
+            assertThat(result).isNotNull();
+            assertThat(result.message()).isEqualTo("User account activated successfully");
+            assertThat(user.isActive()).isTrue();
+
+            // Verify
+            verify(userRepository).findById(eq(user.getId()));
+            verify(userRepository).save(eq(user));
+            verify(refreshTokenService, never()).revokeAllTokensByUser(any());
+        }
+
+        @Test
+        @DisplayName("Should deactivate user, revoke all sessions and return success message")
+        void updateUserStatus_shouldDeactivateUser_andRevokeSessions() {
+
+            // Given
+            UpdateUserStatusRequest request = new UpdateUserStatusRequest(false);
+            User user = createSavedUser();
+
+            when(userRepository.findById(eq(user.getId()))).thenReturn(Optional.of(user));
+
+            // When
+            MessageResponse result = userService.updateUserStatus(user.getId(), request);
+
+            // Then
+            assertThat(result).isNotNull();
+            assertThat(result.message()).isEqualTo("User account deactivated successfully");
+            assertThat(user.isActive()).isFalse();
+
+            // Verify
+            verify(userRepository).findById(eq(user.getId()));
+            verify(userRepository).save(eq(user));
+            verify(refreshTokenService).revokeAllTokensByUser(eq(user.getId()));
+        }
+
+        @Test
+        @DisplayName("Should throw UserNotFoundException when user does not exist")
+        void updateUserStatus_shouldThrowException_whenUserNotFound() {
+
+            // Given
+            UpdateUserStatusRequest request = new UpdateUserStatusRequest(false);
+
+            when(userRepository.findById(eq(99L))).thenReturn(Optional.empty());
+
+            // When & Then
+            assertThatThrownBy(() -> userService.updateUserStatus(99L, request))
+                .isInstanceOf(UserNotFoundException.class)
+                .hasMessageContaining("User not found");
+
+            // Verify
+            verify(userRepository).findById(eq(99L));
+            verify(userRepository, never()).save(any());
+            verifyNoInteractions(refreshTokenService);
         }
     }
 
