@@ -4,7 +4,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Optional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,15 +61,6 @@ public class RefreshTokenService {
          * value is exposed. The server only persists the hash for security.
          */
         return rawToken;
-    }
-
-    /**
-     * Finds an active (non-revoked, non-expired) refresh token by its raw value.
-     * Used internally for token validation.
-     */
-    private Optional<RefreshToken> findByToken(String token) {
-        String tokenHash = hasher.hash(token);
-        return repository.findByTokenHashAndRevokedFalse(tokenHash);
     }
 
     /**
@@ -151,15 +141,5 @@ public class RefreshTokenService {
         if (token.isExpired()) {
             throw new InvalidRefreshTokenException("Refresh token has expired");
         }
-    }
-
-    /**
-     * Checks if a refresh token is valid for rotation.
-     * Returns true if the token is active (non-revoked, non-expired).
-     */
-    public boolean isTokenValid(String rawToken) {
-        return findByToken(rawToken)
-                .map(RefreshToken::isActive)
-                .orElse(false);
     }
 }
