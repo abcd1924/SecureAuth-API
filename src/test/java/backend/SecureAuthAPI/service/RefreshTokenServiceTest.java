@@ -1,0 +1,85 @@
+package backend.SecureAuthAPI.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import java.time.Clock;
+import java.time.Instant;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+import backend.secureauthapi.model.RefreshToken;
+import backend.secureauthapi.model.Role;
+import backend.secureauthapi.model.User;
+import backend.secureauthapi.repository.RefreshTokenRepository;
+import backend.secureauthapi.security.util.RefreshTokenGenerator;
+import backend.secureauthapi.security.util.RefreshTokenHasher;
+import backend.secureauthapi.service.RefreshTokenService;
+
+@ExtendWith(MockitoExtension.class)
+class RefreshTokenServiceTest {
+
+    @Mock private RefreshTokenRepository repository;
+    @Mock private RefreshTokenGenerator generator;
+    @Mock private RefreshTokenHasher hasher;
+    @Mock private Clock clock;
+
+    @InjectMocks private RefreshTokenService refreshTokenService;
+
+    @BeforeEach
+    void setUp() {
+
+        ReflectionTestUtils.setField(refreshTokenService, "refreshTokenDurationMs", 604800000L);
+    }
+
+    @Nested
+    @DisplayName("Issue Refresh Token Tests")
+    class IssueRefreshTokenTests {
+
+        @Test
+        @DisplayName("Should generate, hash, persist and return the raw token")
+        void issueRefreshToken_shouldReturnRawToken_andPersistHashedToken() {
+
+            // Given
+            User user = createSavedUser();
+            String deviceInfo = "Chrome/Windows";
+            String ipAddress = "192.168.1.1";
+
+            String rawToken = "raw-uuid-token-value";
+            String tokenHash = "hashed-token-value";
+
+            Instant fixedNow = Instant.parse("2026-02-26T18:00:00Z");
+
+            when(clock.instant()).thenReturn(fixedNow);
+            when(generator.generateRefreshToken()).thenReturn(rawToken);
+            when(hasher.hash(eq(rawToken))).thenReturn(tokenHash);
+
+            // When
+            String result = refreshTokenService.issueRefreshToken(user, deviceInfo, ipAddress);
+
+            // Then
+            assertThat(result).isEqualTo(rawToken);
+            assertThat(result).isNotEqualTo(tokenHash);
+
+            // Verify
+            verify(generator).generateRefreshToken();
+            verify(hasher).hash(eq(rawToken));
+            verify(repository).save(any(RefreshToken.class));
+        }
+    }
+
+    private User createSavedUser() {
+        User user = new User("John Doe", "john@example.com", "encodedPassword", Role.USER);
+        user.setId(1L);
+        user.setCreatedAt(Instant.now());
+        return user;
+    }
+}
