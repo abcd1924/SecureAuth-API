@@ -85,6 +85,11 @@ public class RefreshTokenService {
     @Transactional
     public void revokeAllTokensByUser(Long userId) {
         List<RefreshToken> activeTokens = repository.findByUserIdAndRevokedFalse(userId);
+
+        if (activeTokens.isEmpty()) {
+            return;
+        }
+
         activeTokens.forEach(RefreshToken::revoke);
         repository.saveAll(activeTokens);
     }
