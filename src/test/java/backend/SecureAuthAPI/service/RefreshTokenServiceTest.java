@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -130,6 +131,55 @@ class RefreshTokenServiceTest {
             verify(hasher).hash(eq(rawToken));
             verify(repository).findByTokenHashAndRevokedFalse(eq(tokenHash));
             verify(repository, never()).save(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("Revoke All Tokens By User Tests")
+    class RevokeAllTokensByUserTests {
+
+        @Test
+        @DisplayName("Should revoke all active tokens for a user")
+        void revokeAllTokensByUser_shouldRevokeAllActiveTokens_whenUserHasActiveTokens() {
+
+            // Given
+            User user = createSavedUser();
+            String hash1 = "hash-token-1";
+            String hash2 = "hash-token-2";
+
+            RefreshToken token1 = createActiveToken(user, hash1);
+            RefreshToken token2 = createActiveToken(user, hash2);
+            List<RefreshToken> activeTokens = List.of(token1, token2);
+
+            when(repository.findByUserIdAndRevokedFalse(eq(user.getId()))).thenReturn(activeTokens);
+
+            // When
+            refreshTokenService.revokeAllTokensByUser(user.getId());
+
+            // Then
+            assertThat(token1.isRevoked()).isTrue();
+            assertThat(token2.isRevoked()).isTrue();
+
+            // Verify
+            verify(repository).findByUserIdAndRevokedFalse(eq(user.getId()));
+            verify(repository).saveAll(eq(activeTokens));
+        }
+
+        @Test
+        @DisplayName("Should do nothing when user has no active tokens")
+        void revokeAllTokensByUser_shouldDoNothing_whenUserHasNoActiveTokens() {
+
+            // Given
+            Long userId = 99L;
+
+            when(repository.findByUserIdAndRevokedFalse(eq(userId))).thenReturn(List.of());
+
+            // When
+            refreshTokenService.revokeAllTokensByUser(userId);
+
+            // Verify
+            verify(repository).findByUserIdAndRevokedFalse(eq(userId));
+            verify(repository, never()).saveAll(any());
         }
     }
 
