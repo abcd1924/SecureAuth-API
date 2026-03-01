@@ -331,7 +331,8 @@ class UserServiceTest {
             Pageable pageable = PageRequest.of(0, 5);
 
             User user1 = createSavedUser();
-            User user2 = createSavedUser(); user2.setId(2L);
+            User user2 = createSavedUser(); 
+            user2.setId(2L);
             List<User> users = List.of(user1, user2);
             Page<User> userPage = new PageImpl<>(users, pageable, users.size());
 
