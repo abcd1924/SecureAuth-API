@@ -229,7 +229,7 @@ class AuthServiceTest {
             LoginRequest request = createValidLoginRequest();
 
             when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
-                    .thenThrow(new BadCredentialsException("Bad crendentials"));
+                    .thenThrow(new BadCredentialsException("Bad credentials"));
 
             // When & Then
             assertThatThrownBy(() -> authService.login(request, "Chrome", "127.0.0.1"))
