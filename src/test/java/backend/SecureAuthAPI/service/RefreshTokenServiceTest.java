@@ -8,6 +8,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import java.time.Clock;
 import java.time.Instant;
@@ -318,6 +319,117 @@ class RefreshTokenServiceTest {
             verify(repository).findByTokenHash(eq(tokenHash));
             verify(repository, never()).save(any());
             verifyNoInteractions(generator);
+        }
+    }
+
+    @Nested
+    @DisplayName("Get User From Refresh Token Tests")
+    class GetUserFromRefreshTokenTests {
+
+        @Test
+        @DisplayName("Should return the User associated with a valid token")
+        void getUserFromRefreshToken_shouldReturnUser_whenTokenIsValid() {
+
+            // Given
+            String rawToken = "valid-raw-token";
+            String tokenHash = "valid-token-hash";
+
+            User user = createSavedUser();
+            RefreshToken token = createActiveToken(user, tokenHash);
+
+            when(hasher.hash(eq(rawToken))).thenReturn(tokenHash);
+            when(repository.findByTokenHash(eq(tokenHash))).thenReturn(Optional.of(token));
+
+            // When
+            User result = refreshTokenService.getUserFromRefreshToken(rawToken);
+
+            // Then
+            assertThat(result).isNotNull();
+            assertThat(result.getId()).isEqualTo(user.getId());
+            assertThat(result.getEmail()).isEqualTo(user.getEmail());
+
+            // Verify
+            verify(hasher).hash(eq(rawToken));
+            verify(repository).findByTokenHash(eq(tokenHash));
+        }
+
+        @Test
+        @DisplayName("Should throw InvalidRefreshTokenException when token does not exist")
+        void getUserFromRefreshToken_shouldThrowException_whenTokenNotFound() {
+
+            // Given
+            String rawToken = "nonexistent-token";
+            String tokenHash = "nonexistent-hash";
+
+            when(hasher.hash(eq(rawToken))).thenReturn(tokenHash);
+            when(repository.findByTokenHash(eq(tokenHash))).thenReturn(Optional.empty());
+
+            // When & Then
+            assertThatThrownBy(() -> refreshTokenService.getUserFromRefreshToken(rawToken))
+                    .isInstanceOf(InvalidRefreshTokenException.class)
+                    .hasMessageContaining("Refresh token not found");
+
+            // Verify
+            verify(hasher).hash(eq(rawToken));
+            verify(repository).findByTokenHash(eq(tokenHash));
+        }
+
+        @Test
+        @DisplayName("Should throw RefreshTokenReuseException and revoke all user sessions when token is already revoked")
+        void getUserFromRefreshToken_shouldThrowReuseException_whenTokenIsRevoked() {
+
+            // Given
+            String activeTokenHash = "active-token-hash";
+            String revokedRawToken = "revoked-raw-token";
+            String revokedTokenHash = "revoked-token-hash";
+
+            User user = createSavedUser();
+            RefreshToken activeToken = createActiveToken(user, activeTokenHash);
+            RefreshToken revokedToken = createRevokedToken(user, revokedTokenHash);
+
+            when(hasher.hash(eq(revokedRawToken))).thenReturn(revokedTokenHash);
+
+            when(repository.findByTokenHash(eq(revokedTokenHash)))
+                    .thenReturn(Optional.of(revokedToken));
+
+            when(repository.findByUserIdAndRevokedFalse(eq(user.getId())))
+                    .thenReturn(List.of(activeToken));
+
+            // When & Then
+            assertThatThrownBy(() -> refreshTokenService.getUserFromRefreshToken(revokedRawToken))
+                    .isInstanceOf(RefreshTokenReuseException.class)
+                    .hasMessageContaining("Refresh token reuse detected");
+
+            assertThat(activeToken.isRevoked()).isTrue();
+
+            // Verify
+            verify(repository).findByUserIdAndRevokedFalse(eq(user.getId()));
+            verify(repository).saveAll(List.of(activeToken));
+            verifyNoInteractions(generator);
+        }
+
+        @Test
+        @DisplayName("Should throw InvalidRefreshTokenException when token is expired")
+        void getUserFromRefreshToken_shouldThrowException_whenTokenIsExpired() {
+
+            // Given
+            String rawToken = "expired-raw-token";
+            String tokenHash = "expired-token-hash";
+
+            User user = createSavedUser();
+            RefreshToken expiredToken = createExpiredToken(user, tokenHash);
+
+            when(hasher.hash(eq(rawToken))).thenReturn(tokenHash);
+            when(repository.findByTokenHash(eq(tokenHash))).thenReturn(Optional.of(expiredToken));
+
+            // When & Then
+            assertThatThrownBy(() -> refreshTokenService.getUserFromRefreshToken(rawToken))
+                    .isInstanceOf(InvalidRefreshTokenException.class)
+                    .hasMessageContaining("Refresh token has expired");
+                
+            // Verify
+            verify(repository).findByTokenHash(eq(tokenHash));
+            verifyNoMoreInteractions(repository);
         }
     }
 
