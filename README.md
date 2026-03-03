@@ -11,11 +11,11 @@ The API provides a complete authentication system with JWT-based token managemen
 
 ### Project Goals
 
-- Build a **production-ready** authentication API with enterprise standards
-- Implement **JWT authentication** with access and refresh token patterns
-- Apply **clean architecture** principles with proper separation of concerns
-- Follow **security best practices** for credential management and token handling
-- Demonstrate **professional Java/Spring Boot development** skills
+- Build a production-ready authentication API with enterprise standards
+- Implement JWT authentication with access and refresh token patterns
+- Apply clean architecture principles with proper separation of concerns
+- Follow security best practices for credential management and token handling
+- Demonstrate professional Java/Spring Boot development skills
 
 ---
 
@@ -46,7 +46,7 @@ The API provides a complete authentication system with JWT-based token managemen
 
 ## Architecture
 
-This project follows a **layered architecture** pattern with clear separation of concerns:
+This project follows a layered architecture pattern with clear separation of concerns:
 
 ```
 backend.SecureAuthAPI/
@@ -59,12 +59,52 @@ backend.SecureAuthAPI/
 ├── security/         # Security filters, JWT utilities
 └── service/          # Business logic layer
 ```
+### Authentication Flow
+```mermaid
+sequenceDiagram
+    actor Client
+    participant AuthController
+    participant AuthService
+    participant AuthManager as AuthenticationManager
+    participant JwtUtils
+    participant RefreshTokenService
+    participant Database
+
+    Client->>AuthController: POST /api/auth/login {email, password}
+    AuthController->>AuthService: login(request, deviceInfo, ip)
+    
+    rect rgb(9, 44, 75)
+        Note right of AuthService: Spring Security Validation
+        AuthService->>AuthManager: authenticate(email, password)
+        AuthManager-->>AuthService: Authentication (UserDetails)
+    end
+
+    AuthService->>JwtUtils: generateAccessToken(UserDetails)
+    JwtUtils-->>AuthService: accessToken (JWT)
+
+    AuthService->>Database: findByEmail(email)
+    Database-->>AuthService: User entity
+
+    AuthService->>RefreshTokenService: issueRefreshToken(user, device, ip)
+    
+    rect rgb(14, 84, 14)
+        Note right of RefreshTokenService: Security Practice: Opaque Token
+        RefreshTokenService->>RefreshTokenService: generate rawToken
+        RefreshTokenService->>RefreshTokenService: hash(rawToken) -> tokenHash
+        RefreshTokenService->>Database: save(tokenHash, expiresAt)
+    end
+    
+    RefreshTokenService-->>AuthService: rawRefreshToken
+    
+    AuthService-->>AuthController: LoginResponse(Tokens + UserInfo)
+    AuthController-->>Client: 200 OK {accessToken, refreshToken}
+```
 
 ## Configuration
 
 ### Application Properties
 
-The application uses environment variables for configuration, following the **12-factor app** methodology:
+The application uses environment variables for configuration, following the 12-factor app methodology:
 
 ```properties
 # Database
@@ -115,7 +155,7 @@ JWT_REFRESH_EXPIRATION_MS=604800000  # 7 days
 
 ### Phase 5: Documentation & Testing (In Progress)
 - [X] Swagger/OpenAPI documentation
-- [ ] Unit tests
+- [X] Unit tests
 - [ ] Integration tests
 - [ ] Postman collection
 - [ ] Docker deployment guide
