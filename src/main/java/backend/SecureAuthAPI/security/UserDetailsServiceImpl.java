@@ -20,10 +20,6 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("Invalid credentials"));
 
-        if (!user.isActive()) {
-            throw new UsernameNotFoundException("User is not active");
-        }
-
         return UserDetailsImpl.build(user);
     }
 }
