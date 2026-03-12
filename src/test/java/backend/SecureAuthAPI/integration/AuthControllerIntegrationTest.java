@@ -4,7 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import java.time.Instant;
+import java.util.List;
 import static org.hamcrest.Matchers.containsString;
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -13,17 +16,29 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import backend.secureauthapi.dto.request.LoginRequest;
+import backend.secureauthapi.dto.request.RefreshTokenRequest;
 import backend.secureauthapi.dto.request.RegisterRequest;
+import backend.secureauthapi.model.RefreshToken;
 import backend.secureauthapi.model.Role;
 import backend.secureauthapi.model.User;
+import backend.secureauthapi.repository.RefreshTokenRepository;
 import backend.secureauthapi.repository.UserRepository;
+import backend.secureauthapi.security.util.RefreshTokenHasher;
 
 @DisplayName("AuthController Integration Tests")
 class AuthControllerIntegrationTest extends BaseIntegrationTest {
 
-    @Autowired private UserRepository userRepository;
+    @Autowired
+    private UserRepository userRepository;
 
-    @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired
+    private RefreshTokenRepository refreshTokenRepository;
+
+    @Autowired
+    private RefreshTokenHasher refreshTokenHasher;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     private static final String VALID_NAME = "John Doe";
     private static final String VALID_EMAIL = "john.doe@test.com";
@@ -64,7 +79,7 @@ class AuthControllerIntegrationTest extends BaseIntegrationTest {
             assertThat(savedUser.getPasswordHash()).isNotEqualTo(VALID_PASSWORD);
             assertThat(passwordEncoder.matches(VALID_PASSWORD,
                     savedUser.getPasswordHash()))
-                            .isTrue();
+                    .isTrue();
         }
 
         @Test
@@ -77,9 +92,8 @@ class AuthControllerIntegrationTest extends BaseIntegrationTest {
 
             userRepository.save(existingUser);
 
-            RegisterRequest duplicateRequest =
-                    new RegisterRequest("Jane Doe", VALID_EMAIL,
-                            VALID_PASSWORD);
+            RegisterRequest duplicateRequest = new RegisterRequest("Jane Doe", VALID_EMAIL,
+                    VALID_PASSWORD);
 
             // Act & Assert
             mockMvc.perform(post("/api/auth/register")
@@ -242,6 +256,149 @@ class AuthControllerIntegrationTest extends BaseIntegrationTest {
                     .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.errorCode").value("USER_INACTIVE"));
+        }
+    }
+
+    @Nested
+    @DisplayName("POST /api/auth/refresh")
+    class RefreshTokenTests {
+
+        @Test
+        @Transactional
+        @DisplayName("Should return 200 with new tokens when refresh token is valid")
+        void refreshToken_validToken_returns200WithNewTokens() throws Exception {
+
+            // Arrange
+            User user = new User(VALID_NAME, VALID_EMAIL,
+                    passwordEncoder.encode(VALID_PASSWORD), Role.USER);
+
+            userRepository.save(user);
+
+            LoginRequest loginRequest = new LoginRequest(VALID_EMAIL, VALID_PASSWORD);
+
+            // Perform login to get initial tokens
+            String loginResponse = mockMvc.perform(post("/api/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(loginRequest)))
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString();
+
+            String oldRefreshToken = JsonPath.read(loginResponse, "$.refreshToken");
+
+            RefreshTokenRequest refreshRequest = new RefreshTokenRequest(oldRefreshToken);
+
+            // Act & Assert
+            mockMvc.perform(post("/api/auth/refresh")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(refreshRequest)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.accessToken").isString())
+                    .andExpect(jsonPath("$.refreshToken").isString())
+                    .andExpect(jsonPath("$.tokenType").value("BEARER"))
+                    .andExpect(jsonPath("$.expiresAt").isString());
+        }
+
+        @Test
+        @DisplayName("Should return 400 when refresh token is blank")
+        void refreshToken_blankToken_returns400() throws Exception {
+
+            // Arrange
+            String blankBodyJson = """
+                    {
+                            "refreshToken": ""
+                    }
+                    """;
+
+            // Act & Assert
+            mockMvc.perform(post("/api/auth/refresh")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(blankBodyJson))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
+        }
+
+        @Test
+        @DisplayName("Should return 401 when refresh token does not exist")
+        void refreshToken_nonExistentToken_returns401() throws Exception {
+
+            // Arrange
+            RefreshTokenRequest request = new RefreshTokenRequest("nonexistent-refresh-token");
+
+            // Act & Assert
+            mockMvc.perform(post("/api/auth/refresh")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.message", containsString("not found")))
+                    .andExpect(jsonPath("$.errorCode").value("INVALID_REFRESH_TOKEN"));
+        }
+
+        @Test
+        @Transactional
+        @DisplayName("Should return 401 when refresh token is expired")
+        void refreshToken_expiredToken_returns401() throws Exception {
+
+            // Arrange
+            User user = new User(VALID_NAME, VALID_EMAIL,
+                    passwordEncoder.encode(VALID_PASSWORD), Role.USER);
+
+            userRepository.save(user);
+
+            String expiredRawToken = "expired-refresh-token";
+            String expiredTokenHash = refreshTokenHasher.hash(expiredRawToken);
+            RefreshToken expiredToken = new RefreshToken(expiredTokenHash, user, Instant.now().minusSeconds(60));
+            refreshTokenRepository.save(expiredToken);
+
+            RefreshTokenRequest request = new RefreshTokenRequest(expiredRawToken);
+
+            // Act & Assert
+            mockMvc.perform(post("/api/auth/refresh")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.message", containsString("expired")))
+                    .andExpect(jsonPath("$.errorCode").value("INVALID_REFRESH_TOKEN"));
+        }
+
+        @Test
+        @Transactional
+        @DisplayName("Should return 403 when trying to reuse old token after refresh")
+        void refreshToken_reuseOldToken_returns403() throws Exception {
+
+            // Arrange
+            User user = new User(VALID_NAME, VALID_EMAIL,
+                    passwordEncoder.encode(VALID_PASSWORD), Role.USER);
+
+            userRepository.save(user);
+
+            LoginRequest loginRequest = new LoginRequest(VALID_EMAIL, VALID_PASSWORD);
+
+            String loginResponse = mockMvc.perform(post("/api/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(loginRequest)))
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString();
+
+            String oldRefreshToken = JsonPath.read(loginResponse, "$.refreshToken");
+
+            RefreshTokenRequest refreshRequest = new RefreshTokenRequest(oldRefreshToken);
+
+            mockMvc.perform(post("/api/auth/refresh")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(refreshRequest)))
+                    .andExpect(status().isOk());
+
+            // Act & Assert
+            mockMvc.perform(post("/api/auth/refresh")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(refreshRequest)))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.errorCode").value("TOKEN_REUSE_DETECTED"));
+
+            List<RefreshToken> activeTokens = refreshTokenRepository.findByUserIdAndRevokedFalse(user.getId());
+            assertThat(activeTokens).isEmpty();
         }
     }
 }
