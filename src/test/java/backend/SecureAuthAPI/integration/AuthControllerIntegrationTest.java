@@ -16,6 +16,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import backend.secureauthapi.dto.request.LoginRequest;
+import backend.secureauthapi.dto.request.LogoutRequest;
 import backend.secureauthapi.dto.request.RefreshTokenRequest;
 import backend.secureauthapi.dto.request.RegisterRequest;
 import backend.secureauthapi.model.RefreshToken;
@@ -399,6 +400,172 @@ class AuthControllerIntegrationTest extends BaseIntegrationTest {
 
             List<RefreshToken> activeTokens = refreshTokenRepository.findByUserIdAndRevokedFalse(user.getId());
             assertThat(activeTokens).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("POST /api/auth/logout")
+    class LogoutTests {
+
+        @Test
+        @Transactional
+        @DisplayName("Should return 200 with success message when refresh token is valid")
+        void logout_validToken_returns200WithSuccessMessage() throws Exception {
+
+            // Arrange
+            User user = new User(VALID_NAME, VALID_EMAIL,
+                    passwordEncoder.encode(VALID_PASSWORD), Role.USER);
+
+            userRepository.save(user);
+
+            LoginRequest loginRequest = new LoginRequest(VALID_EMAIL, VALID_PASSWORD);
+
+            String loginResponse = mockMvc.perform(post("/api/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(loginRequest)))
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString();
+
+            String refreshToken = JsonPath.read(loginResponse, "$.refreshToken");
+            LogoutRequest logoutRequest = new LogoutRequest(refreshToken);
+
+            // Act & Assert
+            mockMvc.perform(post("/api/auth/logout")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(logoutRequest)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.message").value("Logout successful"))
+                    .andExpect(jsonPath("$.timestamp").isString());
+
+            String tokenHash = refreshTokenHasher.hash(refreshToken);
+            RefreshToken savedToken = refreshTokenRepository.findByTokenHash(tokenHash).orElse(null);
+
+            assertThat(savedToken).isNotNull();
+            assertThat(savedToken.isRevoked()).isTrue();
+        }
+
+        @Test
+        @DisplayName("Should return 400 when refresh token is blank")
+        void logout_blankToken_returns400() throws Exception {
+
+            // Arrange
+            String blankBodyJson = """
+                    {
+                            "refreshToken": ""
+                    }
+                    """;
+
+            // Act & Assert
+            mockMvc.perform(post("/api/auth/logout")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(blankBodyJson))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
+        }
+
+        @Test
+        @DisplayName("Should return 200 when refresh token does not exist (idempotent logout)")
+        void logout_nonExistentToken_returns200() throws Exception {
+
+            // Arrange
+            LogoutRequest request = new LogoutRequest("nonexistent-refresh-token");
+
+            // Act & Assert
+            mockMvc.perform(post("/api/auth/logout")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.message").value("Logout successful"))
+                    .andExpect(jsonPath("$.timestamp").isString());
+        }
+
+        @Test
+        @Transactional
+        @DisplayName("Should return 403 when trying to use refresh token after logout")
+        void logout_thenRefreshWithSameToken_returns403() throws Exception {
+
+            // Arrange
+            User user = new User(VALID_NAME, VALID_EMAIL,
+                    passwordEncoder.encode(VALID_PASSWORD), Role.USER);
+
+            userRepository.save(user);
+
+            LoginRequest loginRequest = new LoginRequest(VALID_EMAIL, VALID_PASSWORD);
+
+            String loginResponse = mockMvc.perform(post("/api/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(loginRequest)))
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString();
+
+            String refreshToken = JsonPath.read(loginResponse, "$.refreshToken");
+            LogoutRequest logoutRequest = new LogoutRequest(refreshToken);
+
+            mockMvc.perform(post("/api/auth/logout")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(logoutRequest)))
+                    .andExpect(status().isOk());
+
+            RefreshTokenRequest refreshRequest = new RefreshTokenRequest(refreshToken);
+
+            // Act & Assert
+            mockMvc.perform(post("/api/auth/refresh")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(refreshRequest)))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.errorCode").value("TOKEN_REUSE_DETECTED"));
+        }
+
+        @Test
+        @Transactional
+        @DisplayName("Should keep other device session active after logout on one device")
+        void logout_singleDevice_doesNotRevokeOtherSessions() throws Exception {
+
+            // Arrange
+            User user = new User(VALID_NAME, VALID_EMAIL,
+                    passwordEncoder.encode(VALID_PASSWORD), Role.USER);
+
+            userRepository.save(user);
+
+            LoginRequest loginRequest = new LoginRequest(VALID_EMAIL, VALID_PASSWORD);
+
+            String firstLoginResponse = mockMvc.perform(post("/api/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(loginRequest)))
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString();
+
+            String secondLoginResponse = mockMvc.perform(post("/api/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(loginRequest)))
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString();
+
+            String firstDeviceRefreshToken = JsonPath.read(firstLoginResponse, "$.refreshToken");
+            String secondDeviceRefreshToken = JsonPath.read(secondLoginResponse, "$.refreshToken");
+
+            LogoutRequest logoutFirstDeviceRequest = new LogoutRequest(firstDeviceRefreshToken);
+
+            mockMvc.perform(post("/api/auth/logout")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(logoutFirstDeviceRequest)))
+                    .andExpect(status().isOk());
+
+            RefreshTokenRequest secondDeviceRefreshRequest = new RefreshTokenRequest(secondDeviceRefreshToken);
+
+            // Act & Assert
+            mockMvc.perform(post("/api/auth/refresh")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(secondDeviceRefreshRequest)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.accessToken").isString())
+                    .andExpect(jsonPath("$.refreshToken").isString())
+                    .andExpect(jsonPath("$.tokenType").value("BEARER"))
+                    .andExpect(jsonPath("$.expiresAt").isString());
         }
     }
 }
