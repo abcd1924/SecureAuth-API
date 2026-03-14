@@ -2,6 +2,7 @@ package backend.SecureAuthAPI.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -330,6 +331,71 @@ class UserControllerIntegrationTest extends BaseIntegrationTest {
                     .andExpect(jsonPath("$.error").value("Unauthorized"))
                     .andExpect(jsonPath("$.message").value("Authentication required"))
                     .andExpect(jsonPath("$.path").value("/api/users/me/password"));
+        }
+    }
+
+    @Nested
+    @DisplayName("DELETE /api/users/me")
+    class DeactivateAccountTests {
+
+        @Test
+        @Transactional
+        @DisplayName("Should return 200 and mark account as inactive when token is valid")
+        void deactivateAccount_validToken_returns200AndSetsAccountInactive() throws Exception {
+
+            // Arrange
+            saveUser(VALID_EMAIL, VALID_PASSWORD);
+            String accessToken = loginAndGetAccessToken(VALID_EMAIL, VALID_PASSWORD);
+
+            // Act & Assert
+            mockMvc.perform(delete("/api/users/me")
+                    .header("Authorization", "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.message").value("Account deactivated successfully"))
+                    .andExpect(jsonPath("$.timestamp").isString());
+
+            User deactivatedUser = userRepository.findByEmail(VALID_EMAIL).orElse(null);
+            assertThat(deactivatedUser).isNotNull();
+            assertThat(deactivatedUser.isActive()).isFalse();
+        }
+
+        @Test
+        @Transactional
+        @DisplayName("Should invalidate all active refresh tokens after account deactivation")
+        void deactivateAccount_validToken_revokesAllActiveRefreshTokens() throws Exception {
+
+            // Arrange
+            saveUser(VALID_EMAIL, VALID_PASSWORD);
+            String accessToken = loginAndGetAccessToken(VALID_EMAIL, VALID_PASSWORD);
+            String refreshToken = loginAndGetRefreshToken(VALID_EMAIL, VALID_PASSWORD);
+
+            mockMvc.perform(delete("/api/users/me")
+                    .header("Authorization", "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk());
+
+            // Act & Assert
+            RefreshTokenRequest refreshRequest = new RefreshTokenRequest(refreshToken);
+            mockMvc.perform(post("/api/auth/refresh")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(refreshRequest)))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.errorCode").value("TOKEN_REUSE_DETECTED"));
+        }
+
+        @Test
+        @DisplayName("Should return 401 when token is missing")
+        void deactivateAccount_missingToken_returns401() throws Exception {
+
+            // Act & Assert
+            mockMvc.perform(delete("/api/users/me")
+                    .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.status").value(401))
+                    .andExpect(jsonPath("$.error").value("Unauthorized"))
+                    .andExpect(jsonPath("$.message").value("Authentication required"))
+                    .andExpect(jsonPath("$.path").value("/api/users/me"));
         }
     }
 
