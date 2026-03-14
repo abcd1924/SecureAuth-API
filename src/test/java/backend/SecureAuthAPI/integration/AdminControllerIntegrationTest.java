@@ -1,5 +1,6 @@
 package backend.SecureAuthAPI.integration;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -113,6 +114,115 @@ class AdminControllerIntegrationTest extends BaseIntegrationTest {
 
             // Act & Assert
             mockMvc.perform(get("/api/admin/users")
+                    .header("Authorization", "Bearer " + userAccessToken)
+                    .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /api/admin/users/{id}")
+    class GetUserByIdTests {
+
+        @Test
+        @Transactional
+        @DisplayName("Should return 200 with user data when requester is admin and user exists")
+        void getUserById_existingUserAndAdminToken_returns200WithUserData() throws Exception {
+
+            // Arrange
+            String adminEmail = uniqueEmail("admin-id");
+            String targetUserEmail = uniqueEmail("target-id");
+
+            saveUser("Admin User", adminEmail, VALID_PASSWORD, Role.ADMIN);
+            User targetUser = saveUser("Target User", targetUserEmail, VALID_PASSWORD, Role.USER);
+
+            String adminAccessToken = loginAndGetAccessToken(adminEmail, VALID_PASSWORD);
+
+            // Act & Assert
+            mockMvc.perform(get("/api/admin/users/{id}", targetUser.getId())
+                    .header("Authorization", "Bearer " + adminAccessToken)
+                    .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.id").value(targetUser.getId()))
+                    .andExpect(jsonPath("$.name").value("Target User"))
+                    .andExpect(jsonPath("$.email").value(targetUserEmail))
+                    .andExpect(jsonPath("$.role").value("USER"))
+                    .andExpect(jsonPath("$.isActive").value(true))
+                    .andExpect(jsonPath("$.createdAt").isString())
+                    .andExpect(jsonPath("$.password").doesNotExist())
+                    .andExpect(jsonPath("$.passwordHash").doesNotExist());
+        }
+
+        @Test
+        @Transactional
+        @DisplayName("Should return 404 when requester is admin and user does not exist")
+        void getUserById_nonExistentUser_returns404() throws Exception {
+
+            // Arrange
+            String adminEmail = uniqueEmail("admin-missing");
+            saveUser("Admin User", adminEmail, VALID_PASSWORD, Role.ADMIN);
+
+            String adminAccessToken = loginAndGetAccessToken(adminEmail, VALID_PASSWORD);
+
+            // Act & Assert
+            mockMvc.perform(get("/api/admin/users/{id}", 999999L)
+                    .header("Authorization", "Bearer " + adminAccessToken)
+                    .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.errorCode").value("USER_NOT_FOUND"));
+        }
+
+        @Test
+        @Transactional
+        @DisplayName("Should return 400 when id is not positive")
+        void getUserById_nonPositiveId_returns400() throws Exception {
+
+            // Arrange
+            String adminEmail = uniqueEmail("admin-invalid-id");
+            saveUser("Admin User", adminEmail, VALID_PASSWORD, Role.ADMIN);
+
+            String adminAccessToken = loginAndGetAccessToken(adminEmail, VALID_PASSWORD);
+
+            // Act & Assert
+            mockMvc.perform(get("/api/admin/users/{id}", 0)
+                    .header("Authorization", "Bearer " + adminAccessToken)
+                    .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message", containsString("Id must be positive")));
+        }
+
+        @Test
+        @DisplayName("Should return 401 when token is missing")
+        void getUserById_missingToken_returns401() throws Exception {
+
+            // Act & Assert
+            mockMvc.perform(get("/api/admin/users/{id}", 1L)
+                    .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.status").value(401))
+                    .andExpect(jsonPath("$.error").value("Unauthorized"))
+                    .andExpect(jsonPath("$.message").value("Authentication required"))
+                    .andExpect(jsonPath("$.path").value("/api/admin/users/1"));
+        }
+
+        @Test
+        @Transactional
+        @DisplayName("Should return 403 when requester is not admin")
+        void getUserById_userToken_returns403() throws Exception {
+
+            // Arrange
+            String userEmail = uniqueEmail("non-admin-id");
+
+            User targetUser = saveUser("Target User", uniqueEmail("target-non-admin"),
+                    VALID_PASSWORD, Role.USER);
+
+            saveUser("Regular User", userEmail, VALID_PASSWORD, Role.USER);
+
+            String userAccessToken = loginAndGetAccessToken(userEmail, VALID_PASSWORD);
+
+            // Act & Assert
+            mockMvc.perform(get("/api/admin/users/{id}", targetUser.getId())
                     .header("Authorization", "Bearer " + userAccessToken)
                     .contentType(MediaType.APPLICATION_JSON))
                     .andExpect(status().isForbidden())
