@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import com.jayway.jsonpath.JsonPath;
@@ -15,7 +16,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
+import backend.secureauthapi.dto.request.ChangePasswordRequest;
 import backend.secureauthapi.dto.request.LoginRequest;
+import backend.secureauthapi.dto.request.RefreshTokenRequest;
 import backend.secureauthapi.dto.request.UpdateProfileRequest;
 import backend.secureauthapi.model.Role;
 import backend.secureauthapi.model.User;
@@ -33,6 +36,7 @@ class UserControllerIntegrationTest extends BaseIntegrationTest {
     private static final String VALID_NAME = "John Doe";
     private static final String VALID_EMAIL = "john.doe@test.com";
     private static final String VALID_PASSWORD = "SecurePass123!";
+    private static final String NEW_PASSWORD = "NewSecure456!";
 
     @Nested
     @DisplayName("GET /api/users/me")
@@ -163,7 +167,8 @@ class UserControllerIntegrationTest extends BaseIntegrationTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message", containsString("Name contains invalid characters")))
+                    .andExpect(jsonPath("$.message",
+                            containsString("Name contains invalid characters")))
                     .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
         }
 
@@ -186,6 +191,148 @@ class UserControllerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
+    @Nested
+    @DisplayName("PUT /api/users/me/password")
+    class ChangePasswordTests {
+
+        @Test
+        @Transactional
+        @DisplayName("Should return 200 and update password hash when credentials are valid")
+        void changePassword_validCredentials_returns200AndUpdatesPasswordHash() throws Exception {
+
+            // Arrange
+            saveUser(VALID_EMAIL, VALID_PASSWORD);
+            String accessToken = loginAndGetAccessToken(VALID_EMAIL, VALID_PASSWORD);
+            ChangePasswordRequest request = new ChangePasswordRequest(VALID_PASSWORD, NEW_PASSWORD);
+
+            // Act & Assert
+            mockMvc.perform(put("/api/users/me/password")
+                    .header("Authorization", "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.message")
+                            .value("Password changed successfully. Please login again."))
+                    .andExpect(jsonPath("$.timestamp").isString());
+
+            User updatedUser = userRepository.findByEmail(VALID_EMAIL).orElse(null);
+            assertThat(updatedUser).isNotNull();
+            assertThat(passwordEncoder.matches(NEW_PASSWORD, updatedUser.getPasswordHash())).isTrue();
+            assertThat(passwordEncoder.matches(VALID_PASSWORD, updatedUser.getPasswordHash())).isFalse();
+        }
+
+        @Test
+        @Transactional
+        @DisplayName("Should invalidate all active refresh tokens after password change")
+        void changePassword_validCredentials_revokesAllActiveRefreshTokens() throws Exception {
+
+            // Arrange
+            saveUser(VALID_EMAIL, VALID_PASSWORD);
+
+            String accessToken = loginAndGetAccessToken(VALID_EMAIL, VALID_PASSWORD);
+            String refreshToken = loginAndGetRefreshToken(VALID_EMAIL, VALID_PASSWORD);
+
+            ChangePasswordRequest changeRequest = new ChangePasswordRequest(VALID_PASSWORD, NEW_PASSWORD);
+
+            mockMvc.perform(put("/api/users/me/password")
+                    .header("Authorization", "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(changeRequest)))
+                    .andExpect(status().isOk());
+
+            // Act & Assert
+            RefreshTokenRequest refreshRequest = new RefreshTokenRequest(refreshToken);
+            mockMvc.perform(post("/api/auth/refresh")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(refreshRequest)))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.errorCode").value("TOKEN_REUSE_DETECTED"));
+        }
+
+        @Test
+        @Transactional
+        @DisplayName("Should return 400 when current password is incorrect")
+        void changePassword_incorrectCurrentPassword_returns400() throws Exception {
+
+            // Arrange
+            saveUser(VALID_EMAIL, VALID_PASSWORD);
+            String accessToken = loginAndGetAccessToken(VALID_EMAIL, VALID_PASSWORD);
+            ChangePasswordRequest request = new ChangePasswordRequest("WrongPass999!", NEW_PASSWORD);
+
+            // Act & Assert
+            mockMvc.perform(put("/api/users/me/password")
+                    .header("Authorization", "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message",
+                            containsString("Current password is incorrect")))
+                    .andExpect(jsonPath("$.errorCode").value("INVALID_PASSWORD"));
+        }
+
+        @Test
+        @Transactional
+        @DisplayName("Should return 400 when new password does not meet security requirements")
+        void changePassword_weakNewPassword_returns400() throws Exception {
+
+            // Arrange
+            saveUser(VALID_EMAIL, VALID_PASSWORD);
+            String accessToken = loginAndGetAccessToken(VALID_EMAIL, VALID_PASSWORD);
+            ChangePasswordRequest request = new ChangePasswordRequest(VALID_PASSWORD, "weakpass");
+
+            // Act & Assert
+            mockMvc.perform(put("/api/users/me/password")
+                    .header("Authorization", "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message", containsString("password")))
+                    .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
+        }
+
+        @Test
+        @Transactional
+        @DisplayName("Should return 400 when required fields are blank")
+        void changePassword_blankFields_returns400() throws Exception {
+
+            // Arrange
+            saveUser(VALID_EMAIL, VALID_PASSWORD);
+            String accessToken = loginAndGetAccessToken(VALID_EMAIL, VALID_PASSWORD);
+            String blankBodyJson = """
+                    {
+                            "currentPassword": "",
+                            "newPassword": ""
+                    }
+                    """;
+
+            // Act & Assert
+            mockMvc.perform(put("/api/users/me/password")
+                    .header("Authorization", "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(blankBodyJson))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
+        }
+
+        @Test
+        @DisplayName("Should return 401 when token is missing")
+        void changePassword_missingToken_returns401() throws Exception {
+
+            // Arrange
+            ChangePasswordRequest request = new ChangePasswordRequest(VALID_PASSWORD, NEW_PASSWORD);
+
+            // Act & Assert
+            mockMvc.perform(put("/api/users/me/password")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.status").value(401))
+                    .andExpect(jsonPath("$.error").value("Unauthorized"))
+                    .andExpect(jsonPath("$.message").value("Authentication required"))
+                    .andExpect(jsonPath("$.path").value("/api/users/me/password"));
+        }
+    }
+
     // Helpers
     private User saveUser(String email, String rawPassword) {
         User user = new User(VALID_NAME, email, passwordEncoder.encode(rawPassword), Role.USER);
@@ -204,5 +351,19 @@ class UserControllerIntegrationTest extends BaseIntegrationTest {
                 .getContentAsString();
 
         return JsonPath.read(loginResponse, "$.accessToken");
+    }
+
+    private String loginAndGetRefreshToken(String email, String password) throws Exception {
+        LoginRequest loginRequest = new LoginRequest(email, password);
+
+        String loginResponse = mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(loginRequest)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        return JsonPath.read(loginResponse, "$.refreshToken");
     }
 }
