@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import backend.secureauthapi.dto.request.LoginRequest;
 import backend.secureauthapi.dto.request.RefreshTokenRequest;
 import backend.secureauthapi.dto.request.UpdateUserRoleRequest;
+import backend.secureauthapi.dto.request.UpdateUserStatusRequest;
 import backend.secureauthapi.model.Role;
 import backend.secureauthapi.model.User;
 import backend.secureauthapi.repository.UserRepository;
@@ -405,6 +406,211 @@ class AdminControllerIntegrationTest extends BaseIntegrationTest {
 
             // Act & Assert
             mockMvc.perform(patch("/api/admin/users/{id}/role", targetUser.getId())
+                    .header("Authorization", "Bearer " + userAccessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
+        }
+    }
+
+    @Nested
+    @DisplayName("PATCH /api/admin/users/{id}/status")
+    class UpdateUserStatusTests {
+
+        @Test
+        @Transactional
+        @DisplayName("Should return 200 and deactivate user when active is false")
+        void updateUserStatus_deactivate_returns200AndPersistsFalse() throws Exception {
+
+            // Arrange
+            String adminEmail = uniqueEmail("admin-status-off");
+            String targetUserEmail = uniqueEmail("target-status-off");
+
+            saveUser("Admin User", adminEmail, VALID_PASSWORD, Role.ADMIN);
+            User targetUser = saveUser("Target User", targetUserEmail, VALID_PASSWORD, Role.USER);
+
+            String adminAccessToken = loginAndGetAccessToken(adminEmail, VALID_PASSWORD);
+            UpdateUserStatusRequest request = new UpdateUserStatusRequest(false);
+
+            // Act & Assert
+            mockMvc.perform(patch("/api/admin/users/{id}/status", targetUser.getId())
+                    .header("Authorization", "Bearer " + adminAccessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.message").value("User account deactivated successfully"))
+                    .andExpect(jsonPath("$.timestamp").isString());
+
+            User updatedUser = userRepository.findById(targetUser.getId()).orElse(null);
+            assertThat(updatedUser).isNotNull();
+            assertThat(updatedUser.isActive()).isFalse();
+        }
+
+        @Test
+        @Transactional
+        @DisplayName("Should return 200 and activate user when active is true")
+        void updateUserStatus_activate_returns200AndPersistsTrue() throws Exception {
+
+            // Arrange
+            String adminEmail = uniqueEmail("admin-status-on");
+            String targetUserEmail = uniqueEmail("target-status-on");
+
+            saveUser("Admin User", adminEmail, VALID_PASSWORD, Role.ADMIN);
+            User targetUser = saveUser("Target User", targetUserEmail, VALID_PASSWORD, Role.USER);
+            targetUser.setActive(false);
+            userRepository.save(targetUser);
+
+            String adminAccessToken = loginAndGetAccessToken(adminEmail, VALID_PASSWORD);
+            UpdateUserStatusRequest request = new UpdateUserStatusRequest(true);
+
+            // Act & Assert
+            mockMvc.perform(patch("/api/admin/users/{id}/status", targetUser.getId())
+                    .header("Authorization", "Bearer " + adminAccessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.message").value("User account activated successfully"));
+
+            User updatedUser = userRepository.findById(targetUser.getId()).orElse(null);
+            assertThat(updatedUser).isNotNull();
+            assertThat(updatedUser.isActive()).isTrue();
+        }
+
+        @Test
+        @Transactional
+        @DisplayName("Should revoke active refresh tokens when user is deactivated")
+        void updateUserStatus_deactivate_revokesActiveRefreshTokens() throws Exception {
+
+            // Arrange
+            String adminEmail = uniqueEmail("admin-status-revoke");
+            String targetUserEmail = uniqueEmail("target-status-revoke");
+
+            saveUser("Admin User", adminEmail, VALID_PASSWORD, Role.ADMIN);
+            User targetUser = saveUser("Target User", targetUserEmail, VALID_PASSWORD, Role.USER);
+
+            String adminAccessToken = loginAndGetAccessToken(adminEmail, VALID_PASSWORD);
+            String targetRefreshToken = loginAndGetRefreshToken(targetUserEmail, VALID_PASSWORD);
+
+            UpdateUserStatusRequest request = new UpdateUserStatusRequest(false);
+
+            mockMvc.perform(patch("/api/admin/users/{id}/status", targetUser.getId())
+                    .header("Authorization", "Bearer " + adminAccessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk());
+
+            // Act & Assert
+            RefreshTokenRequest refreshRequest = new RefreshTokenRequest(targetRefreshToken);
+            mockMvc.perform(post("/api/auth/refresh")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(refreshRequest)))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.errorCode").value("TOKEN_REUSE_DETECTED"));
+        }
+
+        @Test
+        @Transactional
+        @DisplayName("Should return 400 when active status is null")
+        void updateUserStatus_nullActive_returns400() throws Exception {
+
+            // Arrange
+            String adminEmail = uniqueEmail("admin-status-null");
+            User targetUser = saveUser("Target User", uniqueEmail("target-status-null"), VALID_PASSWORD,
+                    Role.USER);
+            saveUser("Admin User", adminEmail, VALID_PASSWORD, Role.ADMIN);
+
+            String adminAccessToken = loginAndGetAccessToken(adminEmail, VALID_PASSWORD);
+
+            String invalidBody = """
+                    {
+                        "active": null
+                    }
+                    """;
+
+            // Act & Assert
+            mockMvc.perform(patch("/api/admin/users/{id}/status", targetUser.getId())
+                    .header("Authorization", "Bearer " + adminAccessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(invalidBody))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
+        }
+
+        @Test
+        @Transactional
+        @DisplayName("Should return 404 when user does not exist")
+        void updateUserStatus_nonExistentUser_returns404() throws Exception {
+
+            // Arrange
+            String adminEmail = uniqueEmail("admin-status-missing");
+            saveUser("Admin User", adminEmail, VALID_PASSWORD, Role.ADMIN);
+            String adminAccessToken = loginAndGetAccessToken(adminEmail, VALID_PASSWORD);
+            UpdateUserStatusRequest request = new UpdateUserStatusRequest(false);
+
+            // Act & Assert
+            mockMvc.perform(patch("/api/admin/users/{id}/status", 999999L)
+                    .header("Authorization", "Bearer " + adminAccessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.errorCode").value("USER_NOT_FOUND"));
+        }
+
+        @Test
+        @Transactional
+        @DisplayName("Should return 400 when id is not positive")
+        void updateUserStatus_nonPositiveId_returns400() throws Exception {
+
+            // Arrange
+            String adminEmail = uniqueEmail("admin-status-invalid-id");
+            saveUser("Admin User", adminEmail, VALID_PASSWORD, Role.ADMIN);
+            String adminAccessToken = loginAndGetAccessToken(adminEmail, VALID_PASSWORD);
+            UpdateUserStatusRequest request = new UpdateUserStatusRequest(false);
+
+            // Act & Assert
+            mockMvc.perform(patch("/api/admin/users/{id}/status", 0)
+                    .header("Authorization", "Bearer " + adminAccessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message", containsString("Id must be positive")));
+        }
+
+        @Test
+        @DisplayName("Should return 401 when token is missing")
+        void updateUserStatus_missingToken_returns401() throws Exception {
+
+            // Arrange
+            UpdateUserStatusRequest request = new UpdateUserStatusRequest(false);
+
+            // Act & Assert
+            mockMvc.perform(patch("/api/admin/users/{id}/status", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.status").value(401))
+                    .andExpect(jsonPath("$.error").value("Unauthorized"))
+                    .andExpect(jsonPath("$.message").value("Authentication required"))
+                    .andExpect(jsonPath("$.path").value("/api/admin/users/1/status"));
+        }
+
+        @Test
+        @Transactional
+        @DisplayName("Should return 403 when requester is not admin")
+        void updateUserStatus_userToken_returns403() throws Exception {
+
+            // Arrange
+            String userEmail = uniqueEmail("non-admin-status");
+            User targetUser = saveUser("Target User", uniqueEmail("target-status-forbidden"),
+                    VALID_PASSWORD, Role.USER);
+            saveUser("Regular User", userEmail, VALID_PASSWORD, Role.USER);
+
+            String userAccessToken = loginAndGetAccessToken(userEmail, VALID_PASSWORD);
+            UpdateUserStatusRequest request = new UpdateUserStatusRequest(false);
+
+            // Act & Assert
+            mockMvc.perform(patch("/api/admin/users/{id}/status", targetUser.getId())
                     .header("Authorization", "Bearer " + userAccessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
