@@ -29,10 +29,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 
-@Tag(
-    name = "Admin",
-    description = "Administrative endpoints for user management (ADMIN role required)"
-)
+@Tag(name = "Admin", description = "Administrative endpoints for user management (ADMIN role required)")
 @SecurityRequirement(name = "bearerAuth")
 @PreAuthorize("hasRole('ADMIN')")
 @Validated
@@ -43,14 +40,12 @@ public class AdminController {
 
     private final UserService userService;
 
-    @Operation(
-            summary = "Get all users in the system",
-            description = """
-                    Returns a paginated list of all users in the system.
+    @Operation(summary = "Get all users in the system", description = """
+            Returns a paginated list of all users in the system.
 
-                    **Default sorting:** By creation date (newest first)
-                    **Default page size:** 10 users per page
-                    """)
+            **Default sorting:** By creation date (newest first)
+            **Default page size:** 10 users per page
+            """)
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Paginated list of users retrieved"),
             @ApiResponse(responseCode = "401", description = "User not authenticated"),
@@ -58,9 +53,7 @@ public class AdminController {
     })
     @GetMapping("/users")
     public ResponseEntity<Page<UserResponse>> getAllUsers(
-            @ParameterObject
-            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC)
-            Pageable pageable) {
+            @ParameterObject @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
 
         Page<UserResponse> users = userService.getAllUsers(pageable);
 
@@ -76,20 +69,15 @@ public class AdminController {
     })
     @GetMapping("/users/{id}")
     public ResponseEntity<UserResponse> getUserById(
-            @Parameter(description = "User ID", example = "1")
-            @PathVariable
-            @Positive(message = "Id must be positive")
-            Long id) {
+            @Parameter(description = "User ID", example = "1") @PathVariable @Positive(message = "Id must be positive") Long id) {
 
         UserResponse user = userService.getUserById(id);
 
         return ResponseEntity.ok(user);
     }
 
-    @Operation(
-            summary = "Update user role",
-            description = "Updates the role of a specific user. "
-                    + "All active refresh tokens for the user will be revoked to ensure the new role takes effect immediately on next login.")
+    @Operation(summary = "Update user role", description = "Updates the role of a specific user. "
+            + "All active refresh tokens for the user will be revoked to ensure the new role takes effect immediately on next login.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "User role updated successfully"),
             @ApiResponse(responseCode = "400", description = "Invalid request - validation errors"),
@@ -99,10 +87,7 @@ public class AdminController {
     })
     @PatchMapping("/users/{id}/role")
     public ResponseEntity<UserResponse> updateUserRole(
-            @Parameter(description = "User ID", example = "1")
-            @PathVariable
-            @Positive(message = "Id must be positive")
-            Long id,
+            @Parameter(description = "User ID", example = "1") @PathVariable @Positive(message = "Id must be positive") Long id,
             @Valid @RequestBody UpdateUserRoleRequest request) {
 
         UserResponse userResponse = userService.updateUserRole(id, request);
@@ -110,18 +95,16 @@ public class AdminController {
         return ResponseEntity.ok(userResponse);
     }
 
-    @Operation(
-            summary = "Update user status",
-            description = """
-                    Activates or deactivates a user account.
+    @Operation(summary = "Update user status", description = """
+            Activates or deactivates a user account.
 
-                    **When deactivating:**
-                    - All active refresh tokens are revoked
-                    - User cannot log in until reactivated
-                    - Existing access tokens remain valid until expiration
+            **When deactivating:**
+            - All active refresh tokens are revoked
+            - User cannot log in until reactivated
+            - Existing access tokens remain valid until expiration
 
-                    **Note:** This is a soft delete - user data is preserved.
-                    """)
+            **Note:** This is a soft delete - user data is preserved.
+            """)
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "User status updated successfully"),
             @ApiResponse(responseCode = "400", description = "Invalid request - validation errors"),
@@ -131,8 +114,7 @@ public class AdminController {
     })
     @PatchMapping("/users/{id}/status")
     public ResponseEntity<MessageResponse> updateUserStatus(
-            @Parameter(description = "User ID", example = "1")
-            @PathVariable @Positive(message = "Id must be positive") Long id,
+            @Parameter(description = "User ID", example = "1") @PathVariable @Positive(message = "Id must be positive") Long id,
             @Valid @RequestBody UpdateUserStatusRequest request) {
 
         MessageResponse messageResponse = userService.updateUserStatus(id, request);

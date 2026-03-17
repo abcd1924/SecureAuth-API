@@ -44,16 +44,16 @@ public class OpenApiConfig {
                 .title("SecureAuth-API")
                 .description("""
                         Secure Authentication and Authorization REST API built with Spring Boot 3 and Java 21.
-                        
+
                         **Features:**
                         - JWT-based authentication with access and refresh tokens
                         - Role-based access control (RBAC) with multiple roles
                         - Secure password encryption using BCrypt
                         - Token refresh mechanism for extended sessions
                         - RESTful API design following industry best practices
-                        
+
                         **Available Roles:** USER, ADMIN, AUDITOR, SUPPORT
-                        
+
                         **How to use:**
                         1. Register a new user via POST /api/auth/register
                         2. Login to obtain JWT tokens via POST /api/auth/login
@@ -81,9 +81,9 @@ public class OpenApiConfig {
                 .bearerFormat("JWT")
                 .description("""
                         Enter the JWT access token obtained from the login endpoint.
-                        
+
                         **Format:** Just paste the token value (without 'Bearer ' prefix)
-                        
+
                         **Example workflow:**
                         1. Call POST /api/auth/login with valid credentials
                         2. Copy the 'accessToken' from the response
@@ -100,10 +100,10 @@ public class OpenApiConfig {
                 new Server()
                         .url("http://localhost:8080")
                         .description("Local Development Server")
-                // Here you can add more servers for different environments like production
-                // new Server()
-                // .url("https://api.secureauth.example.com")
-                // .description("Production Server")
+        // Here you can add more servers for different environments like production
+        // new Server()
+        // .url("https://api.secureauth.example.com")
+        // .description("Production Server")
         );
     }
 

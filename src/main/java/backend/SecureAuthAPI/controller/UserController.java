@@ -22,10 +22,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
-@Tag(
-    name = "User",
-    description = "User management endpoints for authenticated users"
-)
+@Tag(name = "User", description = "User management endpoints for authenticated users")
 @SecurityRequirement(name = "bearerAuth")
 @PreAuthorize("isAuthenticated()")
 @RestController
@@ -63,10 +60,9 @@ public class UserController {
         return ResponseEntity.ok(userResponse);
     }
 
-    @Operation(
-            summary = "Change current user password",
-            description = "Requires the current password for verification. " +
-                    "All active sessions will be terminated after password change.")
+    @Operation(summary = "Change current user password", description = "Requires the current password for verification. "
+            +
+            "All active sessions will be terminated after password change.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Password changed successfully"),
             @ApiResponse(responseCode = "400", description = "Invalid request - validation errors"),
@@ -81,10 +77,9 @@ public class UserController {
         return ResponseEntity.ok(messageResponse);
     }
 
-    @Operation(summary = "Deactivate current user account",
-            description = "This is a soft delete - the account is marked as inactive but not removed. "
-                    +
-                    "All active sessions will be terminated.")
+    @Operation(summary = "Deactivate current user account", description = "This is a soft delete - the account is marked as inactive but not removed. "
+            +
+            "All active sessions will be terminated.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Account deactivated"),
             @ApiResponse(responseCode = "401", description = "User not authenticated")

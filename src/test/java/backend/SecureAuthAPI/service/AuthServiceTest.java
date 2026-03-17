@@ -45,15 +45,29 @@ import backend.secureauthapi.service.RefreshTokenService;
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
 
-    @Mock private UserRepository userRepository;
-    @Mock private PasswordEncoder passwordEncoder;
-    @Mock private AuthenticationManager authenticationManager;
-    @Mock private JwtUtils jwtUtils;
-    @Mock private RefreshTokenService refreshTokenService;
-    @Mock private UserMapper userMapper;
-    @Mock private UserDetailsService userDetailsService;
+    @Mock
+    private UserRepository userRepository;
 
-    @InjectMocks private AuthService authService;
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private AuthenticationManager authenticationManager;
+
+    @Mock
+    private JwtUtils jwtUtils;
+
+    @Mock
+    private RefreshTokenService refreshTokenService;
+    
+    @Mock
+    private UserMapper userMapper;
+    
+    @Mock
+    private UserDetailsService userDetailsService;
+
+    @InjectMocks
+    private AuthService authService;
 
     @BeforeEach
     void setUp() {
@@ -382,45 +396,45 @@ class AuthServiceTest {
         @DisplayName("Should revoke refresh token and return success message")
         void logout_shouldRevokeTokenAndReturnSuccessMessage() {
 
-                //Given
-                String refreshToken = "valid-refresh-token-uuid";
-                LogoutRequest request = new LogoutRequest(refreshToken);
+            // Given
+            String refreshToken = "valid-refresh-token-uuid";
+            LogoutRequest request = new LogoutRequest(refreshToken);
 
-                doNothing().when(refreshTokenService).revokeToken(eq(refreshToken));
+            doNothing().when(refreshTokenService).revokeToken(eq(refreshToken));
 
-                // When
-                MessageResponse result = authService.logout(request);
+            // When
+            MessageResponse result = authService.logout(request);
 
-                // Then
-                assertThat(result).isNotNull();
-                assertThat(result.message()).isEqualTo("Logout successful");
-                assertThat(result.timestamp()).isNotNull().isBeforeOrEqualTo(Instant.now());
+            // Then
+            assertThat(result).isNotNull();
+            assertThat(result.message()).isEqualTo("Logout successful");
+            assertThat(result.timestamp()).isNotNull().isBeforeOrEqualTo(Instant.now());
 
-                // Verify
-                verify(refreshTokenService).revokeToken(eq(refreshToken));
-                verifyNoMoreInteractions(userRepository, jwtUtils, userMapper, passwordEncoder);
+            // Verify
+            verify(refreshTokenService).revokeToken(eq(refreshToken));
+            verifyNoMoreInteractions(userRepository, jwtUtils, userMapper, passwordEncoder);
         }
 
         @Test
         @DisplayName("Should return success message even when token is already revoked or does not exist")
         void logout_shouldReturnSuccessMessage_whenTokenIsAlreadyRevokedOrNotFound() {
 
-                // Given
-                String alreadyRevokedToken = "already-revoked-token";
-                LogoutRequest request = new LogoutRequest(alreadyRevokedToken);
+            // Given
+            String alreadyRevokedToken = "already-revoked-token";
+            LogoutRequest request = new LogoutRequest(alreadyRevokedToken);
 
-                // revokeToken() uses ifPresent, so it will not throw an exception
-                doNothing().when(refreshTokenService).revokeToken(eq(alreadyRevokedToken));
+            // revokeToken() uses ifPresent, so it will not throw an exception
+            doNothing().when(refreshTokenService).revokeToken(eq(alreadyRevokedToken));
 
-                // When
-                MessageResponse result = authService.logout(request);
+            // When
+            MessageResponse result = authService.logout(request);
 
-                // Then
-                assertThat(result).isNotNull();
-                assertThat(result.message()).isEqualTo("Logout successful");
+            // Then
+            assertThat(result).isNotNull();
+            assertThat(result.message()).isEqualTo("Logout successful");
 
-                // Verify
-                verify(refreshTokenService).revokeToken(eq(alreadyRevokedToken));
+            // Verify
+            verify(refreshTokenService).revokeToken(eq(alreadyRevokedToken));
         }
     }
 

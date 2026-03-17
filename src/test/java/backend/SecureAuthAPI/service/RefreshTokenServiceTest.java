@@ -37,12 +37,20 @@ import backend.secureauthapi.service.RefreshTokenService;
 @ExtendWith(MockitoExtension.class)
 class RefreshTokenServiceTest {
 
-    @Mock private RefreshTokenRepository repository;
-    @Mock private RefreshTokenGenerator generator;
-    @Mock private RefreshTokenHasher hasher;
-    @Mock private Clock clock;
+    @Mock
+    private RefreshTokenRepository repository;
 
-    @InjectMocks private RefreshTokenService refreshTokenService;
+    @Mock
+    private RefreshTokenGenerator generator;
+
+    @Mock
+    private RefreshTokenHasher hasher;
+    
+    @Mock
+    private Clock clock;
+
+    @InjectMocks
+    private RefreshTokenService refreshTokenService;
 
     @BeforeEach
     void setUp() {
@@ -285,8 +293,8 @@ class RefreshTokenServiceTest {
             // When & Then
             assertThatThrownBy(
                     () -> refreshTokenService.rotateAndIssueRefreshToken(revokedRawToken))
-                            .isInstanceOf(RefreshTokenReuseException.class)
-                            .hasMessageContaining("Refresh token reuse detected");
+                    .isInstanceOf(RefreshTokenReuseException.class)
+                    .hasMessageContaining("Refresh token reuse detected");
 
             assertThat(activeToken.isRevoked()).isTrue();
 
@@ -426,7 +434,7 @@ class RefreshTokenServiceTest {
             assertThatThrownBy(() -> refreshTokenService.getUserFromRefreshToken(rawToken))
                     .isInstanceOf(InvalidRefreshTokenException.class)
                     .hasMessageContaining("Refresh token has expired");
-                
+
             // Verify
             verify(repository).findByTokenHash(eq(tokenHash));
             verifyNoMoreInteractions(repository);
