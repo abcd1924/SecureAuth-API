@@ -45,18 +45,26 @@ import backend.secureauthapi.service.UserService;
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
 
-    @Mock private UserRepository userRepository;
-    @Mock private UserMapper userMapper;
-    @Mock private PasswordEncoder passwordEncoder;
-    @Mock private RefreshTokenService refreshTokenService;
+    @Mock
+    private UserRepository userRepository;
 
-    @InjectMocks private UserService userService;
+    @Mock
+    private UserMapper userMapper;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
+    
+    @Mock
+    private RefreshTokenService refreshTokenService;
+
+    @InjectMocks
+    private UserService userService;
 
     @BeforeEach
     void setUp() {
 
-        UsernamePasswordAuthenticationToken authentication =
-                new UsernamePasswordAuthenticationToken("john@example.com", null);
+        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken("john@example.com",
+                null);
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }
@@ -331,7 +339,7 @@ class UserServiceTest {
             Pageable pageable = PageRequest.of(0, 5);
 
             User user1 = createSavedUser();
-            User user2 = createSavedUser(); 
+            User user2 = createSavedUser();
             user2.setId(2L);
             List<User> users = List.of(user1, user2);
             Page<User> userPage = new PageImpl<>(users, pageable, users.size());
@@ -420,8 +428,8 @@ class UserServiceTest {
 
             // When & Then
             assertThatThrownBy(() -> userService.getUserById(99L))
-                .isInstanceOf(UserNotFoundException.class)
-                .hasMessageContaining("User not found");
+                    .isInstanceOf(UserNotFoundException.class)
+                    .hasMessageContaining("User not found");
 
             // Verify
             verify(userRepository).findById(eq(99L));
@@ -476,8 +484,8 @@ class UserServiceTest {
 
             // When & Then
             assertThatThrownBy(() -> userService.updateUserRole(99L, request))
-                .isInstanceOf(UserNotFoundException.class)
-                .hasMessageContaining("User not found");
+                    .isInstanceOf(UserNotFoundException.class)
+                    .hasMessageContaining("User not found");
 
             // Verify
             verify(userRepository).findById(eq(99L));
@@ -549,8 +557,8 @@ class UserServiceTest {
 
             // When & Then
             assertThatThrownBy(() -> userService.updateUserStatus(99L, request))
-                .isInstanceOf(UserNotFoundException.class)
-                .hasMessageContaining("User not found");
+                    .isInstanceOf(UserNotFoundException.class)
+                    .hasMessageContaining("User not found");
 
             // Verify
             verify(userRepository).findById(eq(99L));

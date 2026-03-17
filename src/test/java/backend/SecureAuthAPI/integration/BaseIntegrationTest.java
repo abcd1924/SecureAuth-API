@@ -18,13 +18,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public abstract class BaseIntegrationTest {
 
     @Container
-    @ServiceConnection 
-    protected static final MySQLContainer<?> mySQLContainer =
-            new MySQLContainer<>("mysql:8.0");
+    @ServiceConnection
+    protected static final MySQLContainer<?> mySQLContainer = new MySQLContainer<>("mysql:8.0");
 
-    @Autowired 
+    @Autowired
     protected MockMvc mockMvc;
 
-    @Autowired 
+    @Autowired
     protected ObjectMapper objectMapper;
 }
