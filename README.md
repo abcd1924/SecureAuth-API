@@ -1,16 +1,13 @@
 # SecureAuthAPI
-
 > **Project Status: Core Features Implemented**  
 > This project has successfully implemented the core authentication and authorization features. The API is functional and follows enterprise-grade best practices. Additional features and improvements are planned (see Roadmap).
 
 ## Overview
-
 **SecureAuthAPI** is an enterprise-grade authentication and authorization REST API built with **Java 21** and **Spring Boot 3.5.9**. This project demonstrates production-ready backend development practices commonly used in modern enterprise applications.
 
 The API provides a complete authentication system with JWT-based token management, role-based authorization, and secure user management—designed to implements real-world authentication services used in production environments.
 
 ### Project Goals
-
 - Build a production-ready authentication API with enterprise standards
 - Implement JWT authentication with access and refresh token patterns
 - Apply clean architecture principles with proper separation of concerns
@@ -20,7 +17,6 @@ The API provides a complete authentication system with JWT-based token managemen
 ---
 
 ## Technology Stack
-
 ### Core Technologies
 - **Java 21** - Latest LTS version with modern language features
 - **Spring Boot 3.5.9** - Enterprise application framework
@@ -45,7 +41,6 @@ The API provides a complete authentication system with JWT-based token managemen
 ---
 
 ## Architecture
-
 This project follows a layered architecture pattern with clear separation of concerns:
 
 ```
@@ -101,9 +96,7 @@ sequenceDiagram
 ```
 
 ## Configuration
-
 ### Application Properties
-
 The application uses environment variables for configuration, following the 12-factor app methodology:
 
 ```properties
@@ -123,7 +116,6 @@ JWT_REFRESH_EXPIRATION_MS=604800000  # 7 days
 
 
 ## Features Implemented
-
 ### Phase 1: Foundation (Completed)
 - [x] Project initialization with Spring Boot 3.5.9
 - [x] MySQL database configuration
@@ -156,16 +148,14 @@ JWT_REFRESH_EXPIRATION_MS=604800000  # 7 days
 ### Phase 5: Documentation & Testing (In Progress)
 - [X] Swagger/OpenAPI documentation
 - [X] Unit tests
-- [ ] Integration tests
+- [X] Controller Integration tests
 - [ ] Postman collection
 - [ ] Docker deployment guide
 
 ---
 
 ## API Endpoints
-
 ### Authentication Endpoints
-
 | Method | Endpoint | Description | Auth Required |
 |--------|----------|-------------|---------------|
 | POST | `/api/auth/register` | Register a new user | No |
@@ -174,7 +164,6 @@ JWT_REFRESH_EXPIRATION_MS=604800000  # 7 days
 | POST | `/api/auth/logout` | Logout and invalidate refresh token | Yes |
 
 ### User Endpoints
-
 | Method | Endpoint | Description | Auth Required | Role Required |
 |--------|----------|-------------|---------------|---------------|
 | GET | `/api/users/me` | Get current user profile | Yes | Any authenticated user |
@@ -183,7 +172,6 @@ JWT_REFRESH_EXPIRATION_MS=604800000  # 7 days
 | DELETE | `/api/users/me` | Deactivates current user account | Yes | Any authenticated user |
 
 ### Admin Endpoints
-
 | Method | Endpoint | Description | Auth Required | Role Required |
 |--------|----------|-------------|---------------|---------------|
 | GET | `/api/admin/users` | Get all users | Yes | ADMIN |
@@ -194,7 +182,6 @@ JWT_REFRESH_EXPIRATION_MS=604800000  # 7 days
 ---
 
 ## API Documentation
-
 ### Interactive API Documentation (Swagger UI)
 
 This API includes interactive documentation powered by Swagger/OpenAPI, allowing you to explore and test all endpoints directly from your browser.
@@ -208,7 +195,6 @@ This API includes interactive documentation powered by Swagger/OpenAPI, allowing
 - Authenticate with JWT to test protected endpoints
 
 ### How to use Swagger UI
-
 1. Start the application (use Getting Started section)
 2. Open Swagger UI in your browser: `http://localhost:8080/swagger-ui.html`
 3. Authenticate (for protected endpoints):
@@ -234,13 +220,11 @@ This API includes interactive documentation powered by Swagger/OpenAPI, allowing
 </div>
 
 ### OpenAPI Specification
-
 The raw OpenAPI 3.0 specification is available at: `http://localhost:8080/v3/api-docs`
 
 ---
 
 ## Getting Started
-
 ### Prerequisites
 
 - **Java 21** or higher
@@ -347,7 +331,7 @@ curl -X GET http://localhost:8080/api/users/me \
 - [ ] Audit logging for security events
 - [ ] Rate limiting for API endpoints
 - [X] Swagger/OpenAPI documentation
-- [ ] Comprehensive test suite (unit + integration)
+- [X] Comprehensive test suite (unit + integration)
 - [ ] Docker containerization
 - [ ] CI/CD pipeline setup
 - [ ] Performance monitoring and metrics
@@ -355,7 +339,6 @@ curl -X GET http://localhost:8080/api/users/me \
 ---
 
 ## License
-
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 This project is developed for educational and portfolio purposes.
@@ -363,7 +346,6 @@ This project is developed for educational and portfolio purposes.
 ---
 
 ## Author
-
 **Valentino Castro**
 - LinkedIn: https://www.linkedin.com/in/valentino-castro-0a929831a
 - GitHub: https://github.com/abcd1924
@@ -371,7 +353,6 @@ This project is developed for educational and portfolio purposes.
 ---
 
 ## Acknowledgments
-
 This project was built to demonstrate enterprise-level Java backend development skills, following industry best practices commonly used in production environments at technology companies in the United States.
 
 ---
