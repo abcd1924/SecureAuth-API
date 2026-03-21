@@ -149,7 +149,7 @@ JWT_REFRESH_EXPIRATION_MS=604800000  # 7 days
 - [X] Swagger/OpenAPI documentation
 - [X] Unit tests
 - [X] Controller Integration tests
-- [ ] Postman collection
+- [X] Postman collection
 - [ ] Docker deployment guide
 
 ---
@@ -221,6 +221,26 @@ This API includes interactive documentation powered by Swagger/OpenAPI, allowing
 
 ### OpenAPI Specification
 The raw OpenAPI 3.0 specification is available at: `http://localhost:8080/v3/api-docs`
+
+---
+
+## Postman Collection
+A ready-to-use Postman Collection and Environment are available in `docs/postman/`.
+
+- Collection: `docs/postman/SecureAuthAPI.postman_collection.json`
+- Environment: `docs/postman/SecureAuthAPI.postman_environment.json`
+
+### Quick Start
+
+1. Import both files into Postman.
+2. Select the `SecureAuth - Local` environment.
+3. Run `Authentication > login` to capture `access_token` and `refresh_token` automatically.
+4. Call protected endpoints from `User Profile` and `Admin Management`.
+
+### Notes
+
+- Tokens are intentionally blank in the committed environment template.
+- Use `Setup and Testing` folder requests to validate `401 Unauthorized` and `403 Forbidden` behavior.
 
 ---
 
