@@ -13,6 +13,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import backend.secureauthapi.security.filter.RateLimitFilter;
 import backend.secureauthapi.security.jwt.AuthEntryPointJwt;
 import backend.secureauthapi.security.jwt.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
@@ -25,9 +26,10 @@ public class WebSecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
+    private final RateLimitFilter rateLimitFilter;
+
     private final AuthEntryPointJwt unauthorizedHandler;
 
-    // Endpoints that don't require authentication
     private static final String[] PUBLIC_ENDPOINTS = {
             "/api/auth/**",
             "/v3/api-docs/**",
@@ -52,13 +54,13 @@ public class WebSecurityConfig {
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                         .anyRequest().authenticated());
 
-        // Add JWT filter before Spring's default user/password filter
+        // Apply rate limiting before JWT authentication, then apply JWT before username/password auth
+        http.addFilterBefore(rateLimitFilter, JwtAuthenticationFilter.class);
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    // Password Encoder
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
