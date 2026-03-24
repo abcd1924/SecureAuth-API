@@ -28,11 +28,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private final Cache<String, Bucket> cache;
     private final ObjectMapper objectMapper;
 
-    @Value("${rate-limit.auth.requests-per-minute:10}")
-    private Integer authLimitPerMinute;
+    @Value("${rate-limit.auth.requests-per-minute}")
+    private int authLimitPerMinute;
 
-    @Value("${rate-limit.api.requests-per-minute:60}")
-    private Integer apiLimitPerMinute;
+    @Value("${rate-limit.api.requests-per-minute}")
+    private int apiLimitPerMinute;
 
     public RateLimitFilter(Cache<String, Bucket> rateLimitCache, ObjectMapper objectMapper) {
         this.cache = rateLimitCache;
