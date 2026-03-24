@@ -55,8 +55,8 @@ public class WebSecurityConfig {
                         .anyRequest().authenticated());
 
         // Apply rate limiting before JWT authentication, then apply JWT before username/password auth
-        http.addFilterBefore(rateLimitFilter, JwtAuthenticationFilter.class);
-        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class);
+        http.addFilterAfter(jwtAuthenticationFilter, RateLimitFilter.class);
 
         return http.build();
     }
