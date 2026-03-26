@@ -16,6 +16,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.jayway.jsonpath.JsonPath;
@@ -50,9 +51,9 @@ class RateLimitIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-            .webAppContextSetup(context)
-            .addFilter(rateLimitFilter)
-            .build();
+                .webAppContextSetup(context)
+                .addFilter(rateLimitFilter)
+                .build();
 
         // Clear rate limit cache before each test
         rateLimitCache.invalidateAll();
@@ -209,6 +210,52 @@ class RateLimitIntegrationTest extends BaseIntegrationTest {
                     .andExpect(jsonPath("$.path").value("/api/users/me"))
                     .andExpect(header().string("RateLimit-Remaining", "0"))
                     .andExpect(header().string("RateLimit-Limit", "60"));
+        }
+    }
+
+    @Nested
+    @DisplayName("Rate Limit Reset Behavior")
+    class RateLimitResetTests {
+
+        @Test
+        @Transactional
+        @DisplayName("Should reset limit after time window expires")
+        void limitReset_afterTimeWindow_allowsNewRequests() throws Exception {
+
+            // Arrange
+            saveUser(VALID_NAME, VALID_EMAIL, VALID_PASSWORD, Role.USER);
+            LoginRequest request = new LoginRequest(VALID_EMAIL, VALID_PASSWORD);
+            String testIp = "192.168.1.250";
+
+            for (int i = 0; i < 10; i++) {
+                mockMvc.perform(post("/api/auth/login")
+                        .header("X-Forwarded-For", testIp)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                        .andExpect(status().isOk());
+            }
+
+            // Act
+            MvcResult blockedResult = mockMvc.perform(post("/api/auth/login")
+                    .header("X-Forwarded-For", testIp)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isTooManyRequests())
+                    .andReturn();
+
+            String retryAfterHeader = blockedResult.getResponse().getHeader("Retry-After");
+            long retryAfterSeconds = Long.parseLong(retryAfterHeader);
+
+            // Wait slightly longer than Retry-After to avoid timing flakiness.
+            Thread.sleep((retryAfterSeconds + 1L) * 1000L);
+
+            // Assert
+            mockMvc.perform(post("/api/auth/login")
+                    .header("X-Forwarded-For", testIp)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andExpect(header().exists("RateLimit-Remaining"));
         }
     }
 
