@@ -244,6 +244,61 @@ A ready-to-use Postman Collection and Environment are available in `docs/postman
 
 ---
 
+## Rate Limiting
+This API includes per-IP rate limiting to reduce abuse and protect authentication endpoints.
+
+### Default Limits
+- **Auth endpoints** (`/api/auth/register`, `/api/auth/login`, `/api/auth/refresh`): **10 requests/minute per IP**
+- **Other API endpoints** (`/api/**`): **60 requests/minute per IP**
+
+### Configuration
+Limits are configurable through environment variables (no code changes required):
+
+```properties
+RATE_LIMIT_AUTH_REQUESTS_PER_MINUTE=10
+RATE_LIMIT_API_REQUESTS_PER_MINUTE=60
+```
+
+If values are not provided, the API uses the defaults above.
+
+### Behavior When Limit Is Exceeded
+- Status: **429 Too Many Requests**
+- JSON error response:
+
+```json
+{
+  "status": 429,
+  "errorCode": "RATE_LIMIT_EXCEEDED",
+  "message": "Too many requests. Please try again later.",
+  "path": "/api/auth/login",
+  "timestamp": "2026-03-27T12:34:56Z"
+}
+```
+
+- Response headers:
+  - `RateLimit-Limit`: endpoint group limit (for example, `10` or `60`)
+  - `RateLimit-Remaining`: remaining tokens in current window
+  - `RateLimit-Reset`: seconds until next token is available
+  - `Retry-After`: seconds to wait before retrying (present on blocked requests)
+
+### Quick Verification
+Run this from a terminal to trigger the auth limit:
+
+```bash
+for i in {1..11}; do
+  curl -s -o /dev/null -w "%{http_code}\n" \
+    -X POST http://localhost:8080/api/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"email":"user@example.com","password":"WrongPass123!"}'
+done
+```
+
+Expected result:
+- First requests return `401` (invalid credentials but still counted by the limiter)
+- Once the auth bucket is exhausted, response becomes `429`
+
+---
+
 ## Getting Started
 ### Prerequisites
 
@@ -349,7 +404,7 @@ curl -X GET http://localhost:8080/api/users/me \
 - [ ] Password reset functionality
 - [ ] Account lockout after failed login attempts
 - [ ] Audit logging for security events
-- [ ] Rate limiting for API endpoints
+- [X] Rate limiting for API endpoints
 - [X] Swagger/OpenAPI documentation
 - [X] Comprehensive test suite (unit + integration)
 - [ ] Docker containerization
