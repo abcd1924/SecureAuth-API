@@ -34,14 +34,22 @@ public class WebSecurityConfig {
             "/api/auth/**",
             "/v3/api-docs/**",
             "/swagger-ui/**",
-            "/swagger-ui.html"
+            "/swagger-ui.html",
+            "/actuator/health",
+            "/actuator/health/**"
+    };
+
+    private static final String[] PROTECTED_ACTUATOR_ENDPOINTS = {
+            "/actuator/metrics",
+            "/actuator/metrics/**",
+            "/actuator/prometheus",
+            "/actuator/prometheus/**"
     };
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // CSRF protection is disabled because this API uses stateless JWT
-                // authentication
+                // CSRF protection is disabled because this API uses stateless JWT authentication
                 .csrf(AbstractHttpConfigurer::disable)
 
                 // Configure exception handling
@@ -52,6 +60,7 @@ public class WebSecurityConfig {
                 // Configure authorization rules
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+                        .requestMatchers(PROTECTED_ACTUATOR_ENDPOINTS).hasRole("ADMIN")
                         .anyRequest().authenticated());
 
         // Apply rate limiting before JWT authentication, then apply JWT before username/password auth
