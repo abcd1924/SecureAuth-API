@@ -14,6 +14,8 @@ import backend.secureauthapi.model.User;
 import backend.secureauthapi.repository.RefreshTokenRepository;
 import backend.secureauthapi.security.util.RefreshTokenGenerator;
 import backend.secureauthapi.security.util.RefreshTokenHasher;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -27,12 +29,14 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class RefreshTokenService {
 
-    @Value("${security.jwt.refresh-expiration-ms}") private Long refreshTokenDurationMs;
+    @Value("${security.jwt.refresh-expiration-ms}")
+    private Long refreshTokenDurationMs;
 
     private final RefreshTokenRepository repository;
     private final RefreshTokenGenerator generator;
     private final RefreshTokenHasher hasher;
     private final Clock clock;
+    private final MeterRegistry meterRegistry;
 
     /**
      * Issues a new refresh token for the given user and persists its hashed value.
@@ -56,6 +60,8 @@ public class RefreshTokenService {
 
         repository.save(refreshToken);
 
+        meterRegistry.counter("token.refresh.issued").increment();
+
         /*
          * Return the raw token to the client; this is the only time the plain-text
          * value is exposed. The server only persists the hash for security.
@@ -69,13 +75,31 @@ public class RefreshTokenService {
      */
     @Transactional
     public void revokeToken(String rawToken) {
+        Timer.Sample sample = Timer.start(meterRegistry);
+        String outcome = "error";
+
         String tokenHash = hasher.hash(rawToken);
 
-        repository.findByTokenHashAndRevokedFalse(tokenHash)
-                .ifPresent(refreshToken -> {
-                    refreshToken.revoke();
-                    repository.save(refreshToken);
-                });
+        try {
+            RefreshToken token = repository.findByTokenHashAndRevokedFalse(tokenHash)
+                    .orElse(null);
+
+            if (token == null) {
+                outcome = "not_found";
+                return;
+            }
+
+            token.revoke();
+            repository.save(token);
+            outcome = "revoked";
+        } finally {
+            meterRegistry.counter("token.refresh.revoke.attempts", "outcome", outcome).increment();
+            sample.stop(Timer.builder("token.refresh.revoke.duration")
+                    .description("Single refresh token revoke duration")
+                    .tag("outcome", outcome)
+                    .publishPercentiles(0.5, 0.95)
+                    .register(meterRegistry));
+        }
     }
 
     /**
@@ -92,6 +116,8 @@ public class RefreshTokenService {
 
         activeTokens.forEach(RefreshToken::revoke);
         repository.saveAll(activeTokens);
+
+        meterRegistry.counter("token.refresh.revoked.bulk").increment(activeTokens.size());
     }
 
     /**
@@ -101,20 +127,33 @@ public class RefreshTokenService {
      */
     @Transactional
     public String rotateAndIssueRefreshToken(String rawToken) {
+        Timer.Sample sample = Timer.start(meterRegistry);
+        String outcome = "failure";
+
         String tokenHash = hasher.hash(rawToken);
 
-        RefreshToken existingToken = repository.findByTokenHash(tokenHash)
-                .orElseThrow(() -> new InvalidRefreshTokenException("Refresh token not found"));
+        try {
+            RefreshToken existingToken = repository.findByTokenHash(tokenHash)
+                    .orElseThrow(() -> new InvalidRefreshTokenException("Refresh token not found"));
 
-        validateToken(existingToken);
+            validateToken(existingToken);
 
-        existingToken.rotate();
-        repository.save(existingToken);
+            existingToken.rotate();
+            repository.save(existingToken);
 
-        return issueRefreshToken(
-                existingToken.getUser(),
-                existingToken.getDeviceInfo(),
-                existingToken.getIpAddress());
+            outcome = "success";
+            return issueRefreshToken(
+                    existingToken.getUser(),
+                    existingToken.getDeviceInfo(),
+                    existingToken.getIpAddress());
+        } finally {
+            meterRegistry.counter("token.refresh.rotate.attempts", "outcome", outcome).increment();
+            sample.stop(Timer.builder("token.refresh.rotate.duration")
+                    .description("Refresh token rotation duration")
+                    .tag("outcome", outcome)
+                    .publishPercentiles(0.5, 0.95)
+                    .register(meterRegistry));
+        }
     }
 
     /**
@@ -123,14 +162,27 @@ public class RefreshTokenService {
      */
     @Transactional(readOnly = true)
     public User getUserFromRefreshToken(String rawToken) {
+        Timer.Sample sample = Timer.start(meterRegistry);
+        String outcome = "failure";
+
         String tokenHash = hasher.hash(rawToken);
 
-        RefreshToken token = repository.findByTokenHash(tokenHash)
-                .orElseThrow(() -> new InvalidRefreshTokenException("Refresh token not found"));
+        try {
+            RefreshToken token = repository.findByTokenHash(tokenHash)
+                    .orElseThrow(() -> new InvalidRefreshTokenException("Refresh token not found"));
 
-        validateToken(token);
+            validateToken(token);
 
-        return token.getUser();
+            outcome = "success";
+            return token.getUser();
+        } finally {
+            meterRegistry.counter("token.refresh.lookup.attempts", "outcome", outcome).increment();
+            sample.stop(Timer.builder("token.refresh.lookup.duration")
+                    .description("Refresh token lookup and validation duration")
+                    .tag("outcome", outcome)
+                    .publishPercentiles(0.5, 0.95)
+                    .register(meterRegistry));
+        }
     }
 
     /**
