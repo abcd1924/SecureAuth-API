@@ -26,6 +26,8 @@ import backend.secureauthapi.model.User;
 import backend.secureauthapi.repository.UserRepository;
 import backend.secureauthapi.security.UserDetailsImpl;
 import backend.secureauthapi.security.jwt.JwtUtils;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -39,8 +41,10 @@ public class AuthService {
     private final RefreshTokenService refreshTokenService;
     private final UserMapper userMapper;
     private final UserDetailsService userDetailsService;
+    private final MeterRegistry meterRegistry;
 
-    @Value("${security.jwt.expiration-ms}") private Long jwtExpirationMs;
+    @Value("${security.jwt.expiration-ms}")
+    private Long jwtExpirationMs;
 
     @Transactional
     public UserResponse register(RegisterRequest registerRequest) {
@@ -59,49 +63,76 @@ public class AuthService {
     @Transactional
     public LoginResponse login(LoginRequest loginRequest, String deviceInfo, String ipAddress) {
 
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(loginRequest.email(),
-                        loginRequest.password()));
+        Timer.Sample sample = Timer.start(meterRegistry);
+        String outcome = "failure";
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(loginRequest.email(),
+                            loginRequest.password()));
 
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+            SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        String accessToken = jwtUtils.generateAccessToken(userDetails);
+            UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
 
-        User user = userRepository.findByEmail(loginRequest.email())
-                .orElseThrow(() -> new InvalidCredentialsException());
+            String accessToken = jwtUtils.generateAccessToken(userDetails);
 
-        String refreshToken = refreshTokenService.issueRefreshToken(user, deviceInfo, ipAddress);
+            User user = userRepository.findByEmail(loginRequest.email())
+                    .orElseThrow(() -> new InvalidCredentialsException());
 
-        Instant expiresAt = Instant.now().plusMillis(jwtExpirationMs);
+            String refreshToken = refreshTokenService.issueRefreshToken(user, deviceInfo, ipAddress);
 
-        UserResponse userResponse = userMapper.toUserResponse(user);
+            Instant expiresAt = Instant.now().plusMillis(jwtExpirationMs);
 
-        return new LoginResponse(accessToken, refreshToken, expiresAt, userResponse);
+            UserResponse userResponse = userMapper.toUserResponse(user);
+            
+            outcome = "success";
+            return new LoginResponse(accessToken, refreshToken, expiresAt, userResponse);
+        } finally {
+            meterRegistry.counter("auth.login.attempts", "outcome", outcome).increment();
+            sample.stop(Timer.builder("auth.login.duration")
+                    .description("Login request duration")
+                    .tag("outcome", outcome)
+                    .publishPercentiles(0.5, 0.95, 0.99)
+                    .register(meterRegistry));
+        }
     }
 
     @Transactional
     public RefreshTokenResponse refreshToken(RefreshTokenRequest refreshTokenRequest) {
 
-        User user = refreshTokenService.getUserFromRefreshToken(refreshTokenRequest.refreshToken());
+        Timer.Sample sample = Timer.start(meterRegistry);
+        String outcome = "failure";
 
-        String newRefreshToken =
-                refreshTokenService.rotateAndIssueRefreshToken(refreshTokenRequest.refreshToken());
+        try {
+            User user = refreshTokenService.getUserFromRefreshToken(refreshTokenRequest.refreshToken());
 
-        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
+            String newRefreshToken = refreshTokenService.rotateAndIssueRefreshToken(refreshTokenRequest.refreshToken());
 
-        String newAccessToken = jwtUtils.generateAccessToken(userDetails);
+            UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
 
-        Instant expiresAt = Instant.now().plusMillis(jwtExpirationMs);
+            String newAccessToken = jwtUtils.generateAccessToken(userDetails);
 
-        return new RefreshTokenResponse(newAccessToken, newRefreshToken, expiresAt);
+            Instant expiresAt = Instant.now().plusMillis(jwtExpirationMs);
+
+            outcome = "success";
+            return new RefreshTokenResponse(newAccessToken, newRefreshToken, expiresAt);
+        } finally {
+            meterRegistry.counter("auth.refresh.attempts", "outcome", outcome).increment();
+            sample.stop(Timer.builder("auth.refresh.duration")
+                    .description("Refresh token request duration")
+                    .tag("outcome", outcome)
+                    .publishPercentiles(0.5, 0.95)
+                    .register(meterRegistry));
+        }
     }
 
     @Transactional
     public MessageResponse logout(LogoutRequest logoutRequest) {
 
         refreshTokenService.revokeToken(logoutRequest.refreshToken());
+
+        meterRegistry.counter("auth.logout").increment();
 
         return new MessageResponse("Logout successful");
     }
