@@ -20,10 +20,10 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import backend.secureauthapi.exception.token.InvalidRefreshTokenException;
 import backend.secureauthapi.exception.token.RefreshTokenReuseException;
 import backend.secureauthapi.model.RefreshToken;
@@ -45,15 +45,23 @@ class RefreshTokenServiceTest {
 
     @Mock
     private RefreshTokenHasher hasher;
-    
+
     @Mock
     private Clock clock;
 
-    @InjectMocks
     private RefreshTokenService refreshTokenService;
+
+    private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     @BeforeEach
     void setUp() {
+
+        refreshTokenService = new RefreshTokenService(
+                repository,
+                generator,
+                hasher,
+                clock,
+                meterRegistry);
 
         ReflectionTestUtils.setField(refreshTokenService, "refreshTokenDurationMs", 604800000L);
     }
