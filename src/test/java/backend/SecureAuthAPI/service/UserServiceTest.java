@@ -17,7 +17,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -27,6 +26,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import backend.secureauthapi.dto.request.ChangePasswordRequest;
 import backend.secureauthapi.dto.request.UpdateProfileRequest;
 import backend.secureauthapi.dto.request.UpdateUserRoleRequest;
@@ -53,15 +53,23 @@ class UserServiceTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
-    
+
     @Mock
     private RefreshTokenService refreshTokenService;
 
-    @InjectMocks
     private UserService userService;
+
+    private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     @BeforeEach
     void setUp() {
+
+        userService = new UserService(
+                userRepository,
+                userMapper,
+                passwordEncoder,
+                refreshTokenService,
+                meterRegistry);
 
         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken("john@example.com",
                 null);
