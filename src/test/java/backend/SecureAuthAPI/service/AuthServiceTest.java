@@ -11,7 +11,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -21,6 +20,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import backend.secureauthapi.dto.request.LoginRequest;
 import backend.secureauthapi.dto.request.LogoutRequest;
 import backend.secureauthapi.dto.request.RefreshTokenRequest;
@@ -59,18 +59,29 @@ class AuthServiceTest {
 
     @Mock
     private RefreshTokenService refreshTokenService;
-    
+
     @Mock
     private UserMapper userMapper;
-    
+
     @Mock
     private UserDetailsService userDetailsService;
 
-    @InjectMocks
     private AuthService authService;
+
+    private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     @BeforeEach
     void setUp() {
+        authService = new AuthService(
+                userRepository,
+                passwordEncoder,
+                authenticationManager,
+                jwtUtils,
+                refreshTokenService,
+                userMapper,
+                userDetailsService,
+                meterRegistry);
+
         ReflectionTestUtils.setField(authService, "jwtExpirationMs", 3600000L);
     }
 
