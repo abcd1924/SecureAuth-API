@@ -299,6 +299,122 @@ Expected result:
 
 ---
 
+## Monitoring & Metrics
+This API includes Spring Boot Actuator and Micrometer Prometheus integration to provide health probes, runtime metrics, and business metrics for authentication flows.
+
+### Monitoring Setup
+Dependencies used:
+- `spring-boot-starter-actuator`
+- `micrometer-registry-prometheus`
+
+Main actuator configuration:
+
+```properties
+management.endpoints.web.exposure.include=health,info,metrics,prometheus
+management.endpoint.health.probes.enabled=true
+management.endpoint.health.roles=ADMIN
+management.endpoint.health.show-details=when-authorized
+management.health.livenessstate.enabled=true
+management.health.readinessstate.enabled=true
+```
+
+### Endpoint Access and Security
+Monitoring endpoints follow least-privilege rules:
+
+| Endpoint | Access | Purpose |
+|---|---|---|
+| `/actuator/health` | Public | General health status for platform checks |
+| `/actuator/health/liveness` | Public | Liveness probe |
+| `/actuator/health/readiness` | Public | Readiness probe |
+| `/actuator/info` | Public (if exposed) | Build/application info |
+| `/actuator/metrics` | ADMIN only | Structured metric names and details |
+| `/actuator/prometheus` | ADMIN only | Prometheus scrape output |
+
+Security notes:
+- Public probe endpoints are intentionally available for container orchestrators and platform health checks.
+- Sensitive metric endpoints are restricted to authenticated users with `ROLE_ADMIN`.
+- Existing API endpoint protections remain unchanged.
+
+### Custom Business Metrics
+Custom metrics are emitted for security-critical flows, including:
+- Login attempts and latency (`auth.login.*`)
+- Token refresh attempts and latency (`auth.refresh.*`, `token.refresh.*`)
+- Account action and deactivation metrics (`user.account.*`)
+
+### Quick Verification Commands
+1. Verify public health endpoint:
+
+```bash
+curl -i http://localhost:8080/actuator/health
+```
+
+2. Verify public liveness/readiness probes:
+
+```bash
+curl -i http://localhost:8080/actuator/health/liveness
+curl -i http://localhost:8080/actuator/health/readiness
+```
+
+3. Verify protected metrics endpoint (requires ADMIN token):
+
+```bash
+curl -i http://localhost:8080/actuator/metrics \
+  -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN"
+```
+
+4. Verify Prometheus scrape output (requires ADMIN token):
+
+```bash
+curl -i http://localhost:8080/actuator/prometheus \
+  -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN"
+```
+
+Expected checks:
+- `/actuator/health*` responds successfully for healthy state.
+- `/actuator/metrics` and `/actuator/prometheus` return `401` without token.
+- Prometheus output contains `# HELP` and `# TYPE` lines.
+
+### Example Prometheus Scrape Config
+If Prometheus runs outside the API process, set the scrape target to this service:
+
+```yaml
+scrape_configs:
+  - job_name: secureauthapi
+    metrics_path: /actuator/prometheus
+    scheme: http
+    static_configs:
+      - targets: ["localhost:8080"]
+```
+
+If your Prometheus setup supports auth headers, include an ADMIN bearer token for this endpoint.
+
+### Degraded and Unhealthy Health States
+Health behavior is also validated when dependencies fail.
+- Integration coverage includes a failing health indicator scenario that verifies the API reports `DOWN` with `503 Service Unavailable` for `/actuator/health`.
+- This confirms probe behavior is reliable for outage detection.
+
+### Troubleshooting Monitoring Misconfigurations
+1. `500` on `/actuator/prometheus` in tests:
+- Ensure Prometheus export is enabled in the active profile.
+- Use:
+
+```properties
+management.prometheus.metrics.export.enabled=true
+```
+
+2. Endpoint not found (`404`):
+- Confirm exposure includes `prometheus` and `metrics`.
+
+3. `401` on `/actuator/metrics` or `/actuator/prometheus`:
+- This is expected without an ADMIN token.
+- Use a valid access token for a user with `ROLE_ADMIN`.
+
+4. Probe details missing in `/actuator/health`:
+- Details are intentionally limited by `management.endpoint.health.show-details=when-authorized`.
+- Authenticate with an authorized role to view component details.
+
+---
+
 ## Getting Started
 ### Prerequisites
 
@@ -407,9 +523,9 @@ curl -X GET http://localhost:8080/api/users/me \
 - [X] Rate limiting for API endpoints
 - [X] Swagger/OpenAPI documentation
 - [X] Comprehensive test suite (unit + integration)
+- [X] Performance monitoring and metrics
 - [ ] Docker containerization
 - [ ] CI/CD pipeline setup
-- [ ] Performance monitoring and metrics
 
 ---
 
