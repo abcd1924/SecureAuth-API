@@ -41,6 +41,7 @@ application-*.yml
 !application.properties
 !application.yml
 !application-test.properties
+!application-docker.properties
 
 # Logs
 logs/
