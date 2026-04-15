@@ -1,0 +1,28 @@
+# Build outputs
+/target/
+/build/
+!.mvn/wrapper/maven-wrapper.jar
+!target/*.jar
+
+# VCS and editor folders
+/.git/
+/.idea/
+/.vscode/
+
+# Local environment and secrets
+.env
+.env.local
+.env.*.local
+*.md
+
+# Runtime logs
+*.log
+/logs/
+/log/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Docker compose overrides (if present locally)
+docker-compose.override.yml
