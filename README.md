@@ -422,6 +422,7 @@ management.prometheus.metrics.export.enabled=true
 - **Maven 3.6+**
 - **MySQL 8.0+**
 - IDE with Java support (IntelliJ IDEA, Eclipse, VS Code)
+- **Docker 20.10+** and **Docker Compose v2** (for containerized run)
 
 ### Installation
 
@@ -461,8 +462,49 @@ management.prometheus.metrics.export.enabled=true
    ```
 
 6. **Access the API**
-   
+    
    The API will be available at: `http://localhost:8080`
+
+### Running with Docker
+Use Docker Compose to start the API and MySQL with one command.
+
+1. Create your environment file:
+   ```bash
+   cp .env.example .env
+   ```
+2. Start containers:
+   ```bash
+   docker compose up --build -d
+   ```
+3. Verify services:
+   ```bash
+   docker compose ps
+   ```
+4. Access:
+   - API: `http://localhost:8080`
+   - Health: `http://localhost:8080/actuator/health`
+   - MySQL (host): `localhost:3307`
+
+#### Docker Architecture
+```mermaid
+flowchart LR
+    Client[Client / Swagger / Postman] -->|HTTP :8080| API[secureauth-api container]
+    API -->|JDBC mysql:3306| DB[secureauth-mysql container]
+    DB --> V[(mysql_data volume)]
+```
+
+#### Common Docker Issues
+1. **Port already in use (`8080` or `3307`)**
+   - Stop local services using those ports, then run `docker compose up -d` again.
+2. **App cannot connect to database on startup**
+   - Check MySQL health: `docker compose ps`.
+   - Wait until MySQL is healthy, then restart API: `docker compose restart app`.
+3. **Changes in `.env` are not applied**
+   - Recreate containers: `docker compose up -d --force-recreate`.
+4. **Need a clean database**
+   - Remove containers and volume: `docker compose down -v`.
+
+For full Docker setup, commands, and operations guide, see [`docker/README.md`](docker/README.md).
 
 ### Example Usage
 
@@ -524,7 +566,7 @@ curl -X GET http://localhost:8080/api/users/me \
 - [X] Swagger/OpenAPI documentation
 - [X] Comprehensive test suite (unit + integration)
 - [X] Performance monitoring and metrics
-- [ ] Docker containerization
+- [X] Docker containerization
 - [ ] CI/CD pipeline setup
 
 ---
